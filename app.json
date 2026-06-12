@@ -1,14 +1,20 @@
 {
   "expo": {
-    "name": "fieles-bienes",
+    "name": "Fieles Bienes",
     "slug": "fieles-bienes",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "fielesbienes",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "icon": "./assets/expo.icon"
+      "icon": "./assets/expo.icon",
+      "deploymentTarget": "16.4",
+      "infoPlist": {
+        "NSLocalNetworkUsageDescription": "Necesario para sincronizar inventario con dispositivos cercanos en la red local.",
+        "NSBonjourServices": ["_fielesbienes._tcp", "_fielesbienes._tcp"],
+        "UIBackgroundModes": ["fetch", "fetch"]
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -17,7 +23,29 @@
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "permissions": [
+        "android.permission.INTERNET",
+        "android.permission.ACCESS_NETWORK_STATE",
+        "android.permission.ACCESS_WIFI_STATE",
+        "android.permission.CHANGE_WIFI_MULTICAST_STATE",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.RECEIVE_BOOT_COMPLETED",
+        "android.permission.WAKE_LOCK",
+        "android.permission.INTERNET",
+        "android.permission.ACCESS_NETWORK_STATE",
+        "android.permission.ACCESS_WIFI_STATE",
+        "android.permission.CHANGE_WIFI_MULTICAST_STATE",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.RECEIVE_BOOT_COMPLETED",
+        "android.permission.WAKE_LOCK"
+      ],
+      "predictiveBackGestureEnabled": false,
+      "softwareKeyboardLayoutMode": "pan",
+      "package": "com.andresdev1868.fielesbienes"
     },
     "web": {
       "output": "static",
@@ -25,6 +53,9 @@
     },
     "plugins": [
       "expo-router",
+      "expo-sqlite",
+      "expo-secure-store",
+      "expo-dev-client",
       [
         "expo-splash-screen",
         {
@@ -34,11 +65,61 @@
             "imageWidth": 76
           }
         }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Permite registrar la ubicación de capillas y parroquias."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Permite adjuntar fotografías del patrimonio de la capilla.",
+          "cameraPermission": "Permite capturar fotografías del inventario de bienes."
+        }
+      ],
+      "expo-background-fetch",
+      "expo-task-manager",
+      "expo-sharing",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "usesCleartextTraffic": true
+          }
+        }
+      ],
+      [
+        "expo-speech-recognition",
+        {
+          "microphonePermission": "Permite dictar nombres y descripciones con la voz.",
+          "speechRecognitionPermission": "Permite transcribir voz a texto para completar formularios.",
+          "androidSpeechServicePackages": [
+            "com.google.android.googlequicksearchbox"
+          ]
+        }
       ]
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "updates": {
+      "url": "https://u.expo.dev/4584f9c8-710a-4511-9e5d-99e8bf1e0b7f",
+      "enabled": true,
+      "checkAutomatically": "ON_LOAD",
+      "fallbackToCacheTimeout": 0
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "4584f9c8-710a-4511-9e5d-99e8bf1e0b7f"
+      }
+    },
+    "owner": "andresdev1868",
+    "runtimeVersion": {
+      "policy": "appVersion"
     }
   }
 }

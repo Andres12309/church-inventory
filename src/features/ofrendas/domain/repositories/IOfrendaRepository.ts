@@ -1,0 +1,16 @@
+import type { Ofrenda } from '../entities/Ofrenda';
+import type { TipoActividad } from '../entities/TipoActividad';
+
+export type OfrendaFiltros = {
+  tipoActividadId?: string;
+  fechaInicio?: string;
+  fechaFin?: string;
+};
+
+export interface IOfrendaRepository {
+  obtenerPorId(id: string): Promise<Ofrenda | null>;
+  listarPorOrganizacion(orgId: string, filtros?: OfrendaFiltros): Promise<Ofrenda[]>;
+  listarTiposActividad(): Promise<TipoActividad[]>;
+  guardar(ofrenda: Ofrenda): Promise<void>;
+  eliminarLogico(id: string, deviceId: string, lamportClock: number): Promise<void>;
+}

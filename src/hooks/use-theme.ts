@@ -1,14 +1,17 @@
-/**
- * Learn more about light and dark modes:
- * https://docs.expo.dev/guides/color-schemes/
- */
-
-import { Colors } from '@/constants/theme';
+import { Colors, Theme, type AppTheme, type LegacyTheme } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
-export function useTheme() {
-  const scheme = useColorScheme();
-  const theme = scheme === 'unspecified' ? 'light' : scheme;
+/** Tema central de diseño (siempre desde `shared/presentation/ui/theme.ts`) */
+export function useAppTheme(): AppTheme {
+  return Theme;
+}
 
-  return Colors[theme];
+/**
+ * Tokens planos para componentes que usan colores semánticos legacy
+ * (text, backgroundElement, primary, danger, etc.)
+ */
+export function useTheme(): LegacyTheme {
+  const scheme = useColorScheme();
+  const mode = scheme === 'unspecified' ? 'light' : scheme;
+  return Colors[mode];
 }

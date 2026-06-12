@@ -1,0 +1,45 @@
+---
+description: Expo Router, FlashList y UI por feature (Screaming Architecture)
+globs: src/features/**/presentation/**,src/shared/presentation/**,src/app/**
+alwaysApply: false
+---
+
+# React Native UI & Routing
+
+## Punto de entrada
+
+- Primera línea de `src/app/_layout.tsx`: `import 'react-native-get-random-values';`
+- Luego providers globales (SQLite, theme, auth).
+
+## Expo Router (SDK 56)
+
+- NO importar `@react-navigation/*`; usar equivalentes de `expo-router`.
+- Rutas en `src/app/` mapean a features: `(bienes)/`, `(ofrendas)/`, etc.
+- Typed routes habilitadas (`experiments.typedRoutes`).
+- Stacks de módulos (`organizaciones`, `bienes`, `ofrendas`, `usuarios`): **`headerShown: false`**.
+- Un solo header por pantalla: `SocialHeader` de `socialUi.tsx` (nunca duplicar con Stack nativo).
+
+## UI social (CRUD)
+
+- Kit: `shared/presentation/ui/socialUi.tsx` + `premiumPalette.ts`.
+- Formularios: `SocialFormScreen`, `SocialFormField`, `SocialOptionPicker`, `SocialPrimaryButton`.
+- Organizaciones: `FormularioOrganizacionScreen` con prop `nivel` (`diocesis` | `parroquia` | `capilla`).
+
+## UI por feature
+
+- Pantallas en `features/<feature>/presentation/screens/`.
+- Hooks de feature en `features/<feature>/presentation/hooks/`.
+- Componentes reutilizables cross-feature solo en `shared/presentation/ui/`.
+- Prohibido carpetas genéricas `src/components` para lógica de negocio.
+
+## Rendimiento
+
+- Listas (>20 ítems): `@shopify/flash-list`, nunca `ScrollView` + `.map()`.
+- `estimatedItemSize` obligatorio; filas con `React.memo`.
+- Paginación SQLite para listas >500 registros.
+- Zustand por feature: `features/<feature>/presentation/store/`.
+
+## Presentación
+
+- UI consume casos de uso vía hooks; sin SQL directo en componentes.
+- Fotos: mostrar desde `foto_uri` local; indicar en UI si foto no disponible en dispositivo remoto.

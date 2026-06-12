@@ -1,56 +1,282 @@
-# Welcome to your Expo app 👋
+<div align="center">
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+# ⛪ Fieles Bienes
 
-## Get started
+**Inventario y finanzas eclesiásticas — offline-first**
 
-1. Install dependencies
+![Expo SDK 56](https://img.shields.io/badge/Expo-SDK%2056-208AEF?style=for-the-badge&logo=expo&logoColor=white)
+![React Native](https://img.shields.io/badge/React%20Native-0.85-61DAFB?style=for-the-badge&logo=react&logoColor=black)
+![SQLite](https://img.shields.io/badge/SQLite-local-003B57?style=for-the-badge&logo=sqlite&logoColor=white)
+![P2P Sync](https://img.shields.io/badge/Sync-P2P%20LAN-10B981?style=for-the-badge)
 
-   ```bash
-   npm install
-   ```
+Aplicación móvil para gestionar **bienes patrimoniales**, **ofrendas**, **jerarquía parroquial** y **usuarios con roles** — sin depender de la nube. Datos en **SQLite**, sincronización entre dispositivos cercanos por **Wi‑Fi local**.
 
-2. Start the app
+[Documentación técnica](./AGENTS.md) · [Expo SDK 56](https://docs.expo.dev/versions/v56.0.0/)
 
-   ```bash
-   npx expo start
-   ```
+</div>
 
-In the output, you'll find options to open the app in a
+---
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+## ✨ Lo esencial
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+| | |
+|---|---|
+| 📴 **100 % offline** | Opera sin internet; la BD vive en el dispositivo |
+| 🏛️ **Jerarquía real** | Catedral → Parroquia → Capilla (configurable vía OTA) |
+| 🔐 **PIN local** | Usuario + PIN de 4 dígitos; sesión en SecureStore |
+| 🤝 **Sync P2P** | mDNS + TCP en LAN; sin servidor central |
+| 📊 **Excel** | Exportar e importar reportes `.xlsx` |
+| 🤖 **Asistente** | Guía conversacional offline (texto + voz en dev build) |
+| 🔄 **OTA** | Parametrización de roles y seeds con EAS Update |
 
-## Get a fresh project
+---
 
-When you're ready, run:
+## 🚀 Experiencia de usuario
 
-```bash
-npm run reset-project
+### 🔑 Autenticación
+
+- Teclado **PIN circular 3×4** (`C` · `0` · borrar)
+- **Recordarme** + lista de usernames guardados (eliminar individual)
+- Login **sin scroll** si cabe en pantalla (`scroll="auto"`)
+- Icono oficial de la app en login y splash animado (`#208AEF`)
+
+### 👋 Bienvenida (sesión restaurada)
+
+Al reabrir la app con sesión activa:
+
+1. Splash con icono animado  
+2. Pantalla de bienvenida personalizada (nombre, rol, saludo según hora)  
+3. **Una frase motivadora aleatoria** (57 frases: fe católica + motivación personal)  
+4. Barra de carga **indeterminada** → dashboard  
+
+> Tras login manual con PIN **no** se muestra la bienvenida extendida.
+
+### 🧭 Navegación (tabs)
+
+| Tab | Icono | Contenido |
+|-----|-------|-----------|
+| **Inicio** | 🏠 | Dashboard, métricas y acciones rápidas |
+| **Inventario** | 📦 | CRUD de bienes por capilla |
+| **Finanzas** | 💰 | Ofrendas por tipo de actividad |
+| **Reportes** | 📈 | Export / import Excel |
+| **Ajustes** | ⚙️ | Perfil, sync P2P, configuración, logout |
+
+**FAB flotante:** 🤖 Asistente Fieles · ⚡ Acciones rápidas (desde Inicio)
+
+---
+
+## 🏗️ Jerarquía organizacional
+
+```
+🏰 Diócesis / Catedral (raíz)
+   └── ⛪ Parroquia
+         └── 🕯️ Capilla (nivel operativo)
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+| Nivel | Inventario & ofrendas | Consolidación |
+|-------|:---------------------:|:-------------:|
+| 🕯️ Capilla | ✅ CRUD directo | — |
+| ⛪ Parroquia | ❌ No directo | ∑ capillas hijas |
+| 🏰 Diócesis | ❌ No directo | ∑ subárbol completo |
 
-### Other setup steps
+- Varios usuarios pueden compartir la misma organización
+- Totales consolidados en background (`inventario_aggregates`)
 
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
+---
 
-## Learn more
+## 👥 Roles y permisos
 
-To learn more about developing your project with Expo, look at the following resources:
+Acceso por **módulo completo** — matriz en `src/shared/config/hierarchy.ts`:
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+| Módulo | Descripción |
+|--------|-------------|
+| ⚙️ `configuracion` | Ajustes de sistema |
+| 👤 `usuarios` | Registro local username + PIN |
+| 🏛️ `organizaciones` | Árbol eclesiástico |
+| 📦 `inventario_bienes` | Bienes físicos |
+| 💰 `ofrendas` | Recaudaciones |
+| 🔄 `sync` | Sincronización P2P |
+| 📊 `reportes` | Excel import/export |
 
-## Join the community
+Roles: `super_admin` · `obispo` · `parroco` · `encargado_capilla`  
+Alcance: `hierarchyAccess.ts` (`full` · `subtree` · `single`)
 
-Join our community of developers creating universal apps.
+---
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+## 📦 Inventario de bienes
+
+- 🎨 Arte sacro · 🪑 Mobiliario · 🔌 Equipos
+- Estado, cantidad, valor estimado, foto local, observaciones
+- Solo en organizaciones **hoja** (capillas)
+- Soft delete + tombstones para sync
+
+---
+
+## 💰 Finanzas (ofrendas)
+
+- ⛪ Misas · 💍 Matrimonios · 🎉 Eventos · 🤝 Colectas · 🎲 Bingos/kermeses
+- Monto, fecha y descripción por capilla
+- Consolidación hacia parroquia y diócesis
+
+---
+
+## 🔄 Sincronización P2P
+
+> ⚠️ Requiere **development build** — no funciona en Expo Go ni web.
+
+| Capa | Tecnología |
+|------|------------|
+| 🔍 Discovery | mDNS `_fielesbienes._tcp` |
+| 📡 Transporte | TCP JSON puerto 49152 |
+| ⚖️ Conflictos | Last-Write-Wins + Lamport |
+| 📋 Tablas | `bienes`, `ofrendas`, `organizaciones` |
+
+**Flujo:** handshake → checksums → delta bidireccional → merge → ACK
+
+- PIN de sesión opcional · historial de sesiones · filtro del propio dispositivo
+- Fotos: **metadatos sí**, binario **no** (v1)
+
+---
+
+## 📊 Reportes Excel
+
+**Exportar:** consolidado · bienes · ofrendas · metadatos → `expo-sharing`  
+**Importar:** vista previa · merge inteligente · validación de alcance
+
+---
+
+## 🤖 Asistente Fieles
+
+Motor **rule-based** en español (sin LLM) en `src/features/asistente/`:
+
+- 💬 Chat con chips navegables según rol
+- 🎤 Dictado por voz (dev build + `expo-speech-recognition`)
+- ⌨️ Teclado sticky con `react-native-keyboard-controller`
+
+---
+
+## 🎯 Primer acceso
+
+1. `npm install` → `npx expo prebuild` → `npx expo run:android`
+2. Abrir app → login
+3. **Admin seed:** `AndDev` / PIN `1868` (`hierarchy.ts`)
+4. Crear parroquias, capillas y usuarios desde la app
+
+Config por defecto: **1 sede raíz** + **1 admin**. Usuarios demo comentados en seed.
+
+---
+
+## 🛠️ Puesta en marcha
+
+### Solo JS (sin P2P)
+
+```bash
+npm install
+npx expo start
+```
+
+Login, CRUD local y reportes ✅ · Sync P2P ❌
+
+### Desarrollo completo
+
+```bash
+npx expo prebuild
+npx expo run:android
+# npx expo run:ios
+```
+
+### Polyfill obligatorio
+
+Primera línea de `src/app/_layout.tsx`:
+
+```typescript
+import 'react-native-get-random-values';
+```
+
+---
+
+## 🧱 Stack técnico
+
+| Área | Tecnología |
+|------|------------|
+| 🚀 Framework | Expo SDK 56 · React Native 0.85 · Expo Router |
+| 🗃️ Estado | Zustand |
+| 💾 BD | expo-sqlite (WAL, migraciones) |
+| 🔐 Auth | PIN SHA-256 · SecureStore |
+| 📜 Listas | @shopify/flash-list |
+| 📗 Excel | xlsx (SheetJS) |
+| 📡 P2P | zeroconf + tcp-socket |
+| 📅 Fechas | date-fns |
+| 🆔 IDs | uuid v4 |
+| ⌨️ Teclado | react-native-keyboard-controller |
+| 🎬 UI | Reanimated · socialUi · premiumPalette |
+
+---
+
+## 📁 Arquitectura
+
+```
+src/
+  app/                 # 🛣️ Expo Router
+  features/
+    auth/              # 🔐 Login, PIN, bienvenida
+    asistente/         # 🤖 Guía conversacional
+    organizaciones/    # 🏛️ Árbol eclesiástico
+    bienes/            # 📦 Inventario
+    ofrendas/          # 💰 Finanzas
+    sync/              # 🔄 P2P
+    reportes/          # 📊 Excel
+    dashboard/         # 🏠 Inicio
+    configuracion/     # ⚙️ Ajustes
+    usuarios/          # 👤 Registro local
+  shared/
+    config/            # hierarchy.ts · hierarchyAccess.ts
+    constants/         # appBranding.ts
+    infrastructure/    # SQLite · background tasks
+    presentation/ui/   # Design system
+```
+
+Detalle ER, protocolo sync, migraciones y tasks: **[AGENTS.md](./AGENTS.md)**
+
+---
+
+## ⏱️ Tareas en background
+
+| Tarea | Función |
+|-------|---------|
+| 🧮 Consolidación | Recalcula totales tras sync / CRUD |
+| 🗑️ Purga sync | `sync_changes` > 60 días |
+| 📄 Limpieza reportes | `.xlsx` > 30 días |
+
+---
+
+## ⚠️ Limitaciones v1
+
+| | |
+|---|---|
+| 📷 Fotos | Solo locales; no sync de binarios por P2P |
+| 📡 P2P | App nativa · misma Wi‑Fi · alcance compartido |
+| 🌐 Web | Sin mDNS/TCP |
+| 📱 Expo Go | Sin módulos nativos de sync ni voz |
+
+---
+
+## 📜 Scripts
+
+| Comando | Descripción |
+|---------|-------------|
+| `npm start` | Metro bundler |
+| `npm run android` | Build + run Android |
+| `npm run ios` | Build + run iOS |
+| `npm run web` | Web (limitada) |
+| `npm run lint` | ESLint |
+
+---
+
+<div align="center">
+
+**Fieles Bienes** — custodiar el patrimonio con orden, fe y excelencia.
+
+Made with 💙 for comunidades eclesiásticas
+
+</div>

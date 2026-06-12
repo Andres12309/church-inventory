@@ -1,0 +1,30 @@
+---
+description: TypeScript estricto en capas domain/application por feature
+globs: src/features/**/domain/**,src/features/**/application/**,src/shared/**/domain/**
+alwaysApply: false
+---
+
+# TypeScript — Domain & Application (por feature)
+
+## Tipado estricto
+
+- `strict: true`. Prohibido `any`; usar `unknown` + type guards.
+- Tipos nominales para IDs: `type OrganizacionId = string & { readonly brand: unique symbol }`.
+- Uniones literales: `UserRole`, `BienEstado`, `SyncStatus`, `ModuloAcceso`.
+- Tipos de dominio en `features/<feature>/domain/`; no duplicar en presentation.
+
+## Capa domain (por feature)
+
+- Sin imports de `expo-*`, `react-native`, `@shopify/flash-list` ni SQLite.
+- Entidades, value objects, interfaces de repositorio, errores de dominio.
+
+## Capa application (por feature)
+
+- Casos de uso orquestan repositorios vía interfaces del **mismo feature** o shared.
+- Permisos en `features/auth/application/` (`PermissionService`).
+- Merge P2P en `features/sync/application/`.
+
+## Cross-feature
+
+- Importar solo desde `features/<otro>/domain/` o barrel `features/<otro>/application/index.ts`.
+- Nunca importar infrastructure/presentation de otro feature.

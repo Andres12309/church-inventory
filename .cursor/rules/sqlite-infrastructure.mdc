@@ -1,0 +1,37 @@
+---
+description: SQLite compartido, migraciones y repositorios por feature
+globs: src/shared/infrastructure/**,src/features/**/infrastructure/**
+alwaysApply: false
+---
+
+# SQLite & Infraestructura
+
+## expo-sqlite (API moderna)
+
+- Promesas/hooks: `useSQLiteContext`, `SQLiteProvider` en `shared/infrastructure/database/`.
+- Transacciones: `db.withTransactionAsync()` para escrituras múltiples.
+- Consultas parametrizadas SIEMPRE (`?`); nunca concatenar SQL.
+- Índices en FKs y filtros (ver `AGENTS.md`).
+- Migraciones centralizadas: `shared/infrastructure/database/migrations/`.
+- Esquema OTA-safe: migraciones incrementales, sin breaking en v1.
+
+## Repositorios por feature
+
+- Implementación en `features/<feature>/infrastructure/<Entity>Repository.ts`.
+- Implementa interfaces de `features/<feature>/domain/repositories/`.
+- Mappers en la misma carpeta infrastructure; no exponer filas SQLite fuera.
+
+## Consolidación
+
+- CTE recursivo sobre `organizaciones.parent_id` para totales (ver `AGENTS.md`).
+- Cache en `inventario_aggregates`; recalcular post-sync en background.
+
+## Multimedia V1
+
+- `foto_uri` se guarda con `expo-file-system` en el dispositivo origen.
+- Serializador P2P en `features/sync/infrastructure/`: omitir campo binario; sync solo metadatos del bien.
+
+## Purga
+
+- Task `PURGE_SYNC_CHANGES_TASK`: eliminar `sync_changes` con `created_at` > 60 días.
+- Task `EXPORT_CLEANUP_TASK`: eliminar `.xlsx` temporales > 30 días.

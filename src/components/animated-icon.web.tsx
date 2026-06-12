@@ -1,8 +1,9 @@
-import { Image } from 'expo-image';
 import { StyleSheet, View } from 'react-native';
-import Animated, { Keyframe, Easing } from 'react-native-reanimated';
+import Animated, { Easing, Keyframe } from 'react-native-reanimated';
 
-import classes from './animated-icon.module.css';
+import { APP_SPLASH_ICON_SIZE } from '@/shared/constants/appBranding';
+import { AppLogo } from '@/shared/presentation/ui/AppLogo';
+
 const DURATION = 300;
 
 export function AnimatedSplashOverlay() {
@@ -39,70 +40,33 @@ const logoKeyframe = new Keyframe({
   },
 });
 
-const glowKeyframe = new Keyframe({
-  0: {
-    transform: [{ rotateZ: '-180deg' }, { scale: 0.8 }],
-    opacity: 0,
-  },
-  [DURATION / 1000]: {
-    transform: [{ rotateZ: '0deg' }, { scale: 1 }],
-    opacity: 1,
-    easing: Easing.elastic(0.7),
-  },
-  100: {
-    transform: [{ rotateZ: '7200deg' }],
-  },
-});
+type AnimatedIconProps = {
+  size?: number;
+};
 
-export function AnimatedIcon() {
+export function AnimatedIcon({ size = APP_SPLASH_ICON_SIZE }: AnimatedIconProps) {
+  const boxSize = size + 16;
+
   return (
-    <View style={styles.iconContainer}>
-      <Animated.View entering={glowKeyframe.duration(60 * 1000 * 4)} style={styles.glow}>
-        <Image style={styles.glow} source={require('@/assets/images/logo-glow.png')} />
+    <View style={[styles.iconContainer, { width: boxSize, height: boxSize }]}>
+      <Animated.View entering={keyframe.duration(DURATION)} style={styles.logoWrap}>
+        <AppLogo size={size} />
       </Animated.View>
-
-      <Animated.View style={styles.background} entering={keyframe.duration(DURATION)}>
-        <div className={classes.expoLogoBackground} />
-      </Animated.View>
-
-      <Animated.View style={styles.imageContainer} entering={logoKeyframe.duration(DURATION)}>
-        <Image style={styles.image} source={require('@/assets/images/expo-logo.png')} />
+      <Animated.View style={styles.logoWrap} entering={logoKeyframe.duration(DURATION)}>
+        <AppLogo size={size} />
       </Animated.View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    alignItems: 'center',
-    width: '100%',
-    zIndex: 1000,
-    position: 'absolute',
-    top: 128 / 2 + 138,
-  },
-  imageContainer: {
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  glow: {
-    width: 201,
-    height: 201,
-    position: 'absolute',
-  },
   iconContainer: {
     justifyContent: 'center',
     alignItems: 'center',
-    width: 128,
-    height: 128,
   },
-  image: {
+  logoWrap: {
     position: 'absolute',
-    width: 76,
-    height: 71,
-  },
-  background: {
-    width: 128,
-    height: 128,
-    position: 'absolute',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });

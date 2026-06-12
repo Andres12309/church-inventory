@@ -1,0 +1,73 @@
+---
+description: Screaming Architecture + Clean Architecture, contexto, P2P, roles y estilo IA
+alwaysApply: true
+---
+
+# Fieles Bienes — Reglas core
+
+## Contexto
+
+App Expo SDK 56 (React Native 0.85) para inventario eclesiástico jerárquico.
+Offline-first, SQLite local, sync P2P LAN, exportación XLSX.
+Fuente de verdad: `AGENTS.md`. Docs Expo: https://docs.expo.dev/versions/v56.0.0/
+
+## Screaming Architecture + Clean Architecture
+
+La estructura **grita el negocio** (features), no carpetas genéricas (`components`, `models`, `views`).
+
+```
+src/
+  app/                          # Solo Expo Router (layouts, providers, rutas)
+  features/
+    organizaciones/             # Jerarquía Capilla → Parroquia → Diócesis
+      domain/ application/ infrastructure/ presentation/
+    bienes/                     # Inventario físico
+    ofrendas/                   # Recaudaciones
+    auth/                       # Usuarios, roles, PIN
+    sync/                       # P2P discovery, merge, sesiones
+    reportes/                   # Exportación XLSX
+    configuracion/              # Niveles, módulos, roles (SuperAdmin)
+  shared/
+    infrastructure/database/    # SQLiteProvider, migraciones (único punto BD)
+    infrastructure/di/          # Contenedor DI
+    presentation/ui/              # Design system (Button, Card, FlashList wrapper)
+```
+
+**Reglas de dependencia:**
+- Dentro de cada feature: `presentation → application → domain ← infrastructure`.
+- Features NO importan `infrastructure` ni `presentation` de otras features.
+- Cross-feature: solo `domain` o interfaces de `application` exportadas explícitamente.
+- Prohibido `src/components`, `src/models`, `src/views` genéricos; todo vive en su feature o `shared/presentation/ui`.
+- `src/app/` solo compone rutas; lógica en `features/*/presentation`.
+
+## Binario nativo blindado (OTA)
+
+- NO agregar dependencias nativas nuevas post-prebuild sin actualizar `AGENTS.md`.
+- Polyfill obligatorio: `import 'react-native-get-random-values'` como **primera línea** de `src/app/_layout.tsx`.
+- Permisos mDNS en `app.json` desde día uno (ver `AGENTS.md` § Bootstrapping).
+- Fotos (`bienes.foto_uri`): solo locales; el payload P2P **excluye** binarios.
+
+## Sincronización P2P
+
+- Merge en `features/sync/application/`; transporte en `features/sync/infrastructure/`.
+- LWW con relojes Lamport + `updated_at` + `device_id`; tombstones para deletes.
+- Registrar sesiones en `sync_sessions`; purga de `sync_changes` > 60 días en background.
+
+## Roles y permisos
+
+- Acceso por **módulo completo** (v1). Matriz en `hierarchy.ts` → `permisos[]`.
+- Jerarquía configurable OTA: **`src/shared/config/hierarchy.ts`** + **`hierarchyAccess.ts`**.
+- Modelo: Catedral → Parroquias → Capillas. Inventario/finanzas solo en capilla; consolidación hacia arriba.
+- Varios usuarios por organización (mismo `organizacion_id`); validación por rol + org asignada.
+- Creación de orgs por rol: `creaOrganizacionNiveles` en `hierarchy.ts`.
+
+## Estilo de respuesta de la IA
+
+- Conciso, modular, archivos <250 líneas.
+- Indicar feature y capa al proponer cambios (ej. `features/bienes/application/CrearBien.ts`).
+- No crear markdown adicional salvo que el usuario lo pida.
+
+## Convenciones
+
+- Español en negocio (`Capilla`, `Ofrenda`); inglés en infra (`Repository`, `UseCase`).
+- Un archivo por entidad/caso de uso/repositorio dentro de su feature.
