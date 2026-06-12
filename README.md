@@ -27,7 +27,7 @@ Aplicación móvil para gestionar **bienes patrimoniales**, **ofrendas**, **jera
 | 🤝 **Sync P2P** | mDNS + TCP en LAN; sin servidor central |
 | 📊 **Excel** | Exportar e importar reportes `.xlsx` |
 | 🤖 **Asistente** | Guía conversacional offline (texto + voz en dev build) |
-| 🔄 **OTA** | Parametrización de roles y seeds con EAS Update |
+| 🔄 **OTA** | Jerarquía (`hierarchy.ts`) y tipos de ofrenda (`tiposActividad.ts`) vía EAS Update |
 
 ---
 
@@ -114,9 +114,18 @@ Alcance: `hierarchyAccess.ts` (`full` · `subtree` · `single`)
 
 ## 💰 Finanzas (ofrendas)
 
-- ⛪ Misas · 💍 Matrimonios · 🎉 Eventos · 🤝 Colectas · 🎲 Bingos/kermeses
-- Monto, fecha y descripción por capilla
-- Consolidación hacia parroquia y diócesis
+Dashboard compacto pensado para pantallas pequeñas: la lista de movimientos ocupa el espacio principal; filtros y resumen van en modales.
+
+| Función | Detalle |
+|---------|---------|
+| 📋 **Lista** | `FlashList` a pantalla completa con filtro por tipo (pills) |
+| 🏷️ **Tipos de actividad** | Crear desde la app (modal **Tipos**) o en el formulario de ingreso |
+| 📅 **Período** | Modal **Filtros y resumen** — fechas, org y desglose por tipo |
+| 🔄 **Sync P2P** | Catálogo `tipos_actividad` sincronizable entre dispositivos |
+| 📊 **Excel** | Hoja «Tipos actividad» en export/import; auto-crea tipos al importar |
+| 🔄 **OTA** | Catálogo base en `src/shared/config/tiposActividad.ts` (ids `seed-tipo-*`) |
+
+Tipos base incluidos: misas, matrimonios, eventos, colectas, bingos/kermeses (editables vía OTA). Monto, fecha y descripción por capilla; consolidación hacia parroquia y diócesis.
 
 ---
 
@@ -129,7 +138,7 @@ Alcance: `hierarchyAccess.ts` (`full` · `subtree` · `single`)
 | 🔍 Discovery | mDNS `_fielesbienes._tcp` |
 | 📡 Transporte | TCP JSON puerto 49152 |
 | ⚖️ Conflictos | Last-Write-Wins + Lamport |
-| 📋 Tablas | `bienes`, `ofrendas`, `organizaciones` |
+| 📋 Tablas | `bienes`, `ofrendas`, `organizaciones`, `tipos_actividad` |
 
 **Flujo:** handshake → checksums → delta bidireccional → merge → ACK
 
@@ -140,8 +149,8 @@ Alcance: `hierarchyAccess.ts` (`full` · `subtree` · `single`)
 
 ## 📊 Reportes Excel
 
-**Exportar:** consolidado · bienes · ofrendas · metadatos → `expo-sharing`  
-**Importar:** vista previa · merge inteligente · validación de alcance
+**Exportar:** consolidado · bienes · ofrendas · tipos de actividad · metadatos → `expo-sharing`  
+**Importar:** vista previa · merge inteligente · validación de alcance · sincroniza catálogo de tipos
 
 ---
 
@@ -163,6 +172,8 @@ Motor **rule-based** en español (sin LLM) en `src/features/asistente/`:
 4. Crear parroquias, capillas y usuarios desde la app
 
 Config por defecto: **1 sede raíz** + **1 admin**. Usuarios demo comentados en seed.
+
+**OTA (EAS Update):** editar `hierarchy.ts` y/o `tiposActividad.ts`, publicar update; al volver a entrar, `ensureAppSeeds` sincroniza orgs, usuarios demo y tipos base hacia SQLite.
 
 ---
 
@@ -230,7 +241,7 @@ src/
     configuracion/     # ⚙️ Ajustes
     usuarios/          # 👤 Registro local
   shared/
-    config/            # hierarchy.ts · hierarchyAccess.ts
+    config/            # hierarchy.ts · hierarchyAccess.ts · tiposActividad.ts
     constants/         # appBranding.ts
     infrastructure/    # SQLite · background tasks
     presentation/ui/   # Design system

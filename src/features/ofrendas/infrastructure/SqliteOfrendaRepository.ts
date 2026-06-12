@@ -8,6 +8,7 @@ import {
 } from '@/shared/infrastructure/database/schema';
 
 import type { Ofrenda } from '../domain/entities/Ofrenda';
+import type { TipoActividad } from '../domain/entities/TipoActividad';
 import type { IOfrendaRepository, OfrendaFiltros } from '../domain/repositories/IOfrendaRepository';
 import { mapOfrendaRow, mapTipoActividadRow, redondearMonto, type OfrendaRow } from './OfrendaMapper';
 
@@ -79,13 +80,82 @@ export class SqliteOfrendaRepository implements IOfrendaRepository {
         ${TiposActividadColumns.ID} AS id,
         ${TiposActividadColumns.CODIGO} AS codigo,
         ${TiposActividadColumns.NOMBRE} AS nombre,
-        ${TiposActividadColumns.ACTIVO} AS activo
+        ${TiposActividadColumns.ACTIVO} AS activo,
+        ${TiposActividadColumns.SYNC_VECTOR} AS sync_vector,
+        ${TiposActividadColumns.UPDATED_AT} AS updated_at,
+        ${TiposActividadColumns.UPDATED_BY_DEVICE} AS updated_by_device
        FROM ${Tables.TIPOS_ACTIVIDAD}
        WHERE ${TiposActividadColumns.ACTIVO} = 1
        ORDER BY ${TiposActividadColumns.NOMBRE} COLLATE NOCASE ASC`,
     );
 
     return rows.map(mapTipoActividadRow);
+  }
+
+  async obtenerTipoActividadPorId(id: string) {
+    const row = await this.db.getFirstAsync<Parameters<typeof mapTipoActividadRow>[0]>(
+      `SELECT
+        ${TiposActividadColumns.ID} AS id,
+        ${TiposActividadColumns.CODIGO} AS codigo,
+        ${TiposActividadColumns.NOMBRE} AS nombre,
+        ${TiposActividadColumns.ACTIVO} AS activo,
+        ${TiposActividadColumns.SYNC_VECTOR} AS sync_vector,
+        ${TiposActividadColumns.UPDATED_AT} AS updated_at,
+        ${TiposActividadColumns.UPDATED_BY_DEVICE} AS updated_by_device
+       FROM ${Tables.TIPOS_ACTIVIDAD}
+       WHERE ${TiposActividadColumns.ID} = ?`,
+      [id],
+    );
+
+    return row ? mapTipoActividadRow(row) : null;
+  }
+
+  async obtenerTipoActividadPorCodigo(codigo: string) {
+    const row = await this.db.getFirstAsync<Parameters<typeof mapTipoActividadRow>[0]>(
+      `SELECT
+        ${TiposActividadColumns.ID} AS id,
+        ${TiposActividadColumns.CODIGO} AS codigo,
+        ${TiposActividadColumns.NOMBRE} AS nombre,
+        ${TiposActividadColumns.ACTIVO} AS activo,
+        ${TiposActividadColumns.SYNC_VECTOR} AS sync_vector,
+        ${TiposActividadColumns.UPDATED_AT} AS updated_at,
+        ${TiposActividadColumns.UPDATED_BY_DEVICE} AS updated_by_device
+       FROM ${Tables.TIPOS_ACTIVIDAD}
+       WHERE ${TiposActividadColumns.CODIGO} = ?`,
+      [codigo],
+    );
+
+    return row ? mapTipoActividadRow(row) : null;
+  }
+
+  async guardarTipoActividad(tipo: TipoActividad): Promise<void> {
+    await this.db.runAsync(
+      `INSERT INTO ${Tables.TIPOS_ACTIVIDAD} (
+        ${TiposActividadColumns.ID},
+        ${TiposActividadColumns.CODIGO},
+        ${TiposActividadColumns.NOMBRE},
+        ${TiposActividadColumns.ACTIVO},
+        ${TiposActividadColumns.SYNC_VECTOR},
+        ${TiposActividadColumns.UPDATED_AT},
+        ${TiposActividadColumns.UPDATED_BY_DEVICE}
+      ) VALUES (?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(${TiposActividadColumns.ID}) DO UPDATE SET
+        ${TiposActividadColumns.CODIGO} = excluded.${TiposActividadColumns.CODIGO},
+        ${TiposActividadColumns.NOMBRE} = excluded.${TiposActividadColumns.NOMBRE},
+        ${TiposActividadColumns.ACTIVO} = excluded.${TiposActividadColumns.ACTIVO},
+        ${TiposActividadColumns.SYNC_VECTOR} = excluded.${TiposActividadColumns.SYNC_VECTOR},
+        ${TiposActividadColumns.UPDATED_AT} = excluded.${TiposActividadColumns.UPDATED_AT},
+        ${TiposActividadColumns.UPDATED_BY_DEVICE} = excluded.${TiposActividadColumns.UPDATED_BY_DEVICE}`,
+      [
+        tipo.id,
+        tipo.codigo,
+        tipo.nombre,
+        tipo.activo ? 1 : 0,
+        tipo.syncVector,
+        tipo.updatedAt,
+        tipo.updatedByDevice,
+      ],
+    );
   }
 
   async guardar(ofrenda: Ofrenda): Promise<void> {

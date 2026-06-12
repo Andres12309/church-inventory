@@ -136,8 +136,8 @@ function construirHojaResumenAoa(
   ];
 
   if (incluirOfrendas) {
-    for (const tipo of data.tiposActividad) {
-      headers.push(`Ofrendas: ${tipo}`);
+    for (const tipo of data.catalogoTiposActividad) {
+      headers.push(`Ofrendas: ${tipo.nombre}`);
     }
   }
 
@@ -159,8 +159,8 @@ function construirHojaResumenAoa(
     ];
 
     if (incluirOfrendas) {
-      for (const tipo of data.tiposActividad) {
-        fila.push(formatearMoneda(row.ofrendasPorTipo[tipo] ?? 0));
+      for (const tipo of data.catalogoTiposActividad) {
+        fila.push(formatearMoneda(row.ofrendasPorTipo[tipo.id] ?? 0));
       }
     }
 
@@ -203,6 +203,18 @@ function construirHojaOfrendas(data: ReporteExportData): Record<string, unknown>
     ID: row.id,
     id_organizacion: row.organizacionId,
     id_tipo_actividad: row.tipoActividadId,
+    updated_at_iso: row.updatedAt,
+  }));
+}
+
+function construirHojaTiposActividad(data: ReporteExportData): Record<string, unknown>[] {
+  return data.catalogoTiposActividad.map((row) => ({
+    Nombre: row.nombre,
+    Código: row.codigo,
+    Activo: row.activo ? 'Sí' : 'No',
+    ID: row.id,
+    id_tipo_actividad: row.id,
+    codigo: row.codigo,
     updated_at_iso: row.updatedAt,
   }));
 }
@@ -272,6 +284,7 @@ export function buildReporteWorkbook(
 
   if (incluirOfrendas) {
     appendSheetFromRows(workbook, 'Ofrendas', construirHojaOfrendas(data));
+    appendSheetFromRows(workbook, 'Tipos actividad', construirHojaTiposActividad(data));
   }
 
   appendSheetFromRows(workbook, 'Organizaciones', construirHojaOrganizaciones(data));

@@ -41,6 +41,14 @@ export type OfrendaExportRow = {
   readonly updatedAt: string;
 };
 
+export type TipoActividadExportRow = {
+  readonly id: string;
+  readonly codigo: string;
+  readonly nombre: string;
+  readonly activo: boolean;
+  readonly updatedAt: string;
+};
+
 export type ResumenOrgRow = {
   readonly orgCodigo: string;
   readonly orgNombre: string;
@@ -61,5 +69,5 @@ export type ReporteExportData = {
   readonly bienes: BienExportRow[];
   readonly ofrendas: OfrendaExportRow[];
   readonly resumen: ResumenOrgRow[];
-  readonly tiposActividad: readonly string[];
+  readonly catalogoTiposActividad: readonly TipoActividadExportRow[];
 };

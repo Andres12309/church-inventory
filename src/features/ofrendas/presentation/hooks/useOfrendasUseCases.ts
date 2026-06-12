@@ -8,6 +8,7 @@ import { SqliteSyncRepository } from '@/features/sync/infrastructure/SqliteSyncR
 import { createConsolidationTrigger } from '@/shared/infrastructure/background/createConsolidationTrigger';
 
 import { ConsultarFinanzas } from '../../application/use-cases/ConsultarFinanzas';
+import { GestionarTipoActividad } from '../../application/use-cases/GestionarTipoActividad';
 import { RegistrarRecaudacion } from '../../application/use-cases/RegistrarRecaudacion';
 import { SqliteOfrendaRepository } from '../../infrastructure/SqliteOfrendaRepository';
 
@@ -21,6 +22,11 @@ export function createOfrendasUseCases(db: SQLiteDatabase) {
     ofrendaRepository,
     organizacionRepository,
     consultarFinanzas: new ConsultarFinanzas(ofrendaRepository, organizacionRepository),
+    gestionarTipoActividad: new GestionarTipoActividad(
+      ofrendaRepository,
+      db,
+      syncRepository,
+    ),
     registrarRecaudacion: new RegistrarRecaudacion(
       ofrendaRepository,
       organizacionRepository,

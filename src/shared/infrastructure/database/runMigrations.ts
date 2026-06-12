@@ -8,11 +8,16 @@ import {
   MIGRATION_002_SQL,
   MIGRATION_002_VERSION,
 } from './migrations/002_usuario_username';
+import {
+  MIGRATION_003_SQL,
+  MIGRATION_003_VERSION,
+} from './migrations/003_tipos_actividad_sync';
 import { SchemaMigrationsColumns, Tables } from './schema';
 
 const MIGRATIONS = [
   { version: MIGRATION_001_VERSION, sql: MIGRATION_001_SQL },
   { version: MIGRATION_002_VERSION, sql: MIGRATION_002_SQL },
+  { version: MIGRATION_003_VERSION, sql: MIGRATION_003_SQL },
 ] as const;
 
 export class DatabaseMigrationError extends Error {

@@ -46,6 +46,33 @@ Catedral (diocesis) ──► N parroquias ──► N capillas
 
 Solo afecta IDs con prefijo `seed-org-` y `seed-user-`. Usuarios creados en la app (UUID) no se modifican.
 
+**Tipos de actividad OTA (`tiposActividad.ts` → SQLite):**
+
+| Acción en `tiposActividad.ts` | Efecto tras OTA + login |
+|-------------------------------|-------------------------|
+| Agregar entrada con id `seed-tipo-*` | INSERT |
+| Cambiar `codigo` o `nombre` | UPSERT (actualiza) |
+| Quitar entrada del array | Desactiva (`activo = 0`) |
+| `activo: false` en la entrada | Desactiva sin quitar del array |
+
+Fuente: **`src/shared/config/tiposActividad.ts`**. Seed idempotente: `ensureTiposActividadSeed.ts` (invocado desde `ensureAppSeeds` en login). Solo afecta IDs `seed-tipo-*`; tipos creados en la app, por P2P o Excel (UUID) no se tocan.
+
+### Módulo Finanzas (ofrendas)
+
+| Pieza | Ubicación | Notas |
+|-------|-----------|-------|
+| Dashboard compacto | `OfrendasDashboardScreen.tsx` | Header + total; toolbar **Período** / **Tipos**; lista `FlashList` con `flex:1` |
+| Filtros y resumen | `FinanzasFiltrosSheet.tsx` | Fechas, org, desglose por tipo (modal) |
+| Tipos de actividad | `TiposActividadSheet.tsx` | Crear tipos en app; catálogo compartido P2P + Excel |
+| Formulario ingreso | `FormularioOfrendaScreen.tsx` | Enlace **Gestionar tipos** si no hay catálogo o para crear otro |
+| Caso de uso | `GestionarTipoActividad.ts` | `crear`, `resolverPorNombre`, `upsertDesdeIntercambio` |
+| Config OTA | `tiposActividad.ts` | Catálogo base desplegable sin recompilar nativo |
+
+**Sincronización del catálogo:**
+- **P2P:** tabla `tipos_actividad` en `SYNCABLE_TABLES` (catálogo global, sin scope org).
+- **Excel:** hoja «Tipos actividad» en export/import; auto-crea tipos al importar ofrendas por nombre.
+- **OTA:** editar `tiposActividad.ts` + EAS Update; aplica en próximo login vía `ensureAppSeeds`.
+
 ### Módulo Organizaciones — CRUD por nivel
 
 | Ruta | Pantalla | Quién |
@@ -315,14 +342,19 @@ reportes_generados (historial exportaciones)
 
 Índices: `(organizacion_id)`, `(organizacion_id, estado)`, `(categoria_id)`, `(updated_at)`.
 
-#### `tipos_actividad` — Catálogo de ofrendas
+#### `tipos_actividad` — Catálogo de ofrendas (global, sync P2P + OTA)
 
 | Columna | Tipo | Notas |
 |---------|------|-------|
-| id | TEXT PK | |
-| codigo | TEXT | `misas_dominicales`, `matrimonios`, `eventos_especiales`, `colectas_solidarias`, `bingos_kermeses` |
-| nombre | TEXT | |
-| activo | INTEGER | |
+| id | TEXT PK | `seed-tipo-*` (OTA) o UUID (app/P2P/Excel) |
+| codigo | TEXT UNIQUE | Slug estable, ej. `misas_dominicales` |
+| nombre | TEXT | Etiqueta visible en UI y reportes |
+| activo | INTEGER | 0 = oculto en selectores |
+| sync_vector | TEXT | JSON Lamport |
+| updated_at | TEXT | |
+| updated_by_device | TEXT | |
+
+Migración `003_tipos_actividad_sync` añade columnas sync en dispositivos existentes. Catálogo base en `src/shared/config/tiposActividad.ts` (OTA) + seeds en `001_initial`.
 
 #### `ofrendas`
 
@@ -482,6 +514,9 @@ Flujo alternativo Android: `react-native-wifi-p2p-sync` (Wi-Fi Direct, solo Andr
 
 ### 4.2 Identificación de discrepancias
 
+**Tablas sincronizables P2P (v1):** `bienes`, `ofrendas`, `organizaciones`, `tipos_actividad`.  
+`tipos_actividad` es catálogo global (sin filtro por `organizacion_id`); el resto respeta scope jerárquico del rol.
+
 Cada registro mutable lleva:
 - `updated_at` (ISO8601 UTC)
 - `updated_by_device` (UUID)
@@ -567,7 +602,7 @@ Acceso por **módulo completo**. Validación en capa `application` (`PermissionS
 
 **Alcance de datos (`organizacion_id`):** ver `hierarchyAccess.ts` — `full` (sistema), `subtree` (obispo/párroco), `single` (encargado).
 
-**Parametrización OTA:** modificar filas en `roles`, `modulos`, `role_modulos` vía migración seed o payload de configuración remota futura. En v1, cambios via migraciones SQLite incluidas en update OTA.
+**Parametrización OTA:** modificar filas en `roles`, `modulos`, `role_modulos` vía migración seed o payload de configuración remota futura. En v1, cambios via migraciones SQLite incluidas en update OTA. Catálogos editables sin migración: `hierarchy.ts` (orgs/usuarios demo) y `tiposActividad.ts` (tipos de ofrenda base) → `ensureAppSeeds` en login.
 
 ---
 

@@ -61,3 +61,18 @@ export async function registrarOrganizacionSync(
     operacion,
   );
 }
+
+export async function registrarTipoActividadSync(
+  db: SQLiteDatabase,
+  syncRepository: SqliteSyncRepository,
+  registroId: string,
+  operacion: typeof SyncOperacion.INSERT | typeof SyncOperacion.UPDATE | typeof SyncOperacion.DELETE,
+): Promise<void> {
+  await registrarCambioSyncDesdeTabla(
+    db,
+    syncRepository,
+    Tables.TIPOS_ACTIVIDAD,
+    registroId,
+    operacion,
+  );
+}

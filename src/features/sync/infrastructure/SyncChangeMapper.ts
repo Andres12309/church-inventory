@@ -60,6 +60,10 @@ export function isChangeInOrgScope(
   payload: Record<string, unknown>,
   scopeSet: Set<string>,
 ): boolean {
+  if (tabla === Tables.TIPOS_ACTIVIDAD) {
+    return true;
+  }
+
   const orgId = extractOrganizacionId(tabla, payload);
   if (!orgId) {
     return false;

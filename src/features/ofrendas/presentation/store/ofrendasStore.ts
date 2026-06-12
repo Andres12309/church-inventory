@@ -10,6 +10,7 @@ import {
 } from '../../application/services/OfrendaAccessPolicy';
 import type { RegistrarRecaudacionInput } from '../../application/dto/RegistrarRecaudacionInput';
 import type { ConsultarFinanzas } from '../../application/use-cases/ConsultarFinanzas';
+import type { GestionarTipoActividad } from '../../application/use-cases/GestionarTipoActividad';
 import type { RegistrarRecaudacion } from '../../application/use-cases/RegistrarRecaudacion';
 import type { Ofrenda } from '../../domain/entities/Ofrenda';
 import type { TipoActividad } from '../../domain/entities/TipoActividad';
@@ -53,6 +54,11 @@ type OfrendasActions = {
     permissionService: PermissionService,
     consultarFinanzas: ConsultarFinanzas,
   ) => Promise<void>;
+  crearTipoActividad: (
+    nombre: string,
+    permissionService: PermissionService,
+    gestionarTipoActividad: GestionarTipoActividad,
+  ) => Promise<TipoActividad>;
   cargarRecaudaciones: (
     usuario: Usuario,
     rol: Rol,
@@ -152,10 +158,27 @@ export const useOfrendasStore = create<OfrendasState & OfrendasActions>((set, ge
   cargarCatalogo: async (permissionService, consultarFinanzas) => {
     try {
       const tiposActividad = await consultarFinanzas.listarTiposActividad(permissionService);
-      set({ tiposActividad });
+      set({ tiposActividad, errorMessage: null });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Error al cargar tipos de actividad';
       set({ errorMessage: message });
+    }
+  },
+
+  crearTipoActividad: async (nombre, permissionService, gestionarTipoActividad) => {
+    set({ errorMessage: null });
+    try {
+      const tipo = await gestionarTipoActividad.crear({ nombre }, permissionService);
+      set((state) => ({
+        tiposActividad: [...state.tiposActividad, tipo].sort((a, b) =>
+          a.nombre.localeCompare(b.nombre, 'es'),
+        ),
+      }));
+      return tipo;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'No se pudo crear el tipo';
+      set({ errorMessage: message });
+      throw error;
     }
   },
 

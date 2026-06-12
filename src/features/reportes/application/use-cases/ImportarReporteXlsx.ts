@@ -8,6 +8,7 @@ import type { Bien } from '@/features/bienes/domain/entities/Bien';
 import type { IBienRepository } from '@/features/bienes/domain/repositories/IBienRepository';
 import type { Ofrenda } from '@/features/ofrendas/domain/entities/Ofrenda';
 import type { IOfrendaRepository } from '@/features/ofrendas/domain/repositories/IOfrendaRepository';
+import { GestionarTipoActividad } from '@/features/ofrendas/application/use-cases/GestionarTipoActividad';
 import { redondearMonto } from '@/features/ofrendas/infrastructure/OfrendaMapper';
 import type { IOrganizacionRepository } from '@/features/organizaciones/domain/repositories/IOrganizacionRepository';
 import { SqliteSyncRepository } from '@/features/sync/infrastructure/SqliteSyncRepository';
@@ -37,6 +38,7 @@ import {
   type ParsedBienImportRow,
   type ParsedOfrendaImportRow,
   type ParsedReporteImport,
+  type ParsedTipoActividadImportRow,
 } from '../../infrastructure/XlsxReportParser';
 
 export class ReporteImportPermissionDeniedError extends Error {
@@ -145,6 +147,7 @@ export class ImportarReporteXlsx {
     private readonly bienRepository: IBienRepository,
     private readonly ofrendaRepository: IOfrendaRepository,
     private readonly organizacionRepository: IOrganizacionRepository,
+    private readonly gestionarTipoActividad: GestionarTipoActividad,
     private readonly db: SQLiteDatabase,
     private readonly consolidationTrigger: IConsolidationTrigger,
     private readonly syncRepository: SqliteSyncRepository,
@@ -197,8 +200,15 @@ export class ImportarReporteXlsx {
     }
 
     const orgsAfectadas = new Set<string>();
+    await this.persistirTiposActividad(contexto.parsed.tiposActividad, permissionService);
+    await this.refrescarMapasTipos(contexto, permissionService);
     await this.persistirBienes(contexto, evaluacion.bienesEvaluaciones, orgsAfectadas);
-    await this.persistirOfrendas(contexto, evaluacion.ofrendasEvaluaciones, orgsAfectadas);
+    await this.persistirOfrendas(
+      contexto,
+      evaluacion.ofrendasEvaluaciones,
+      orgsAfectadas,
+      permissionService,
+    );
 
     for (const orgId of orgsAfectadas) {
       this.consolidationTrigger.dispararParaOrganizacion(orgId);
@@ -469,6 +479,8 @@ export class ImportarReporteXlsx {
         continue;
       }
 
+      const existente = await this.ofrendaRepository.obtenerPorId(row.id);
+
       const tipoActividadId =
         (row.tipoActividadId && contexto.tipoPorId.get(row.tipoActividadId)) ??
         (row.tipoActividadNombre
@@ -476,6 +488,25 @@ export class ImportarReporteXlsx {
           : undefined);
 
       if (!tipoActividadId) {
+        if (row.tipoActividadNombre) {
+          evaluaciones.push({
+            row,
+            accion: existente ? 'actualizar' : 'insertar',
+            organizacionId,
+            tipoActividadId: null,
+            existente,
+            mensaje: `Se creará o vinculará el tipo «${row.tipoActividadNombre}»`,
+          });
+          ejemplos.push({
+            tipo: 'ofrenda',
+            accion: existente ? 'actualizar' : 'insertar',
+            titulo: `${row.fecha} · $${row.monto}`,
+            subtitulo: row.tipoActividadNombre,
+            detalle: 'Tipo de actividad nuevo — se registrará al importar',
+          });
+          continue;
+        }
+
         const mensaje = `Ofrenda ${row.fecha}: tipo de actividad no reconocido`;
         mensajesError.push(mensaje);
         evaluaciones.push({
@@ -495,8 +526,6 @@ export class ImportarReporteXlsx {
         });
         continue;
       }
-
-      const existente = await this.ofrendaRepository.obtenerPorId(row.id);
 
       if (existente && existente.organizacionId !== organizacionId) {
         const mensaje = `Ofrenda ${row.fecha}: conflicto de organización`;
@@ -604,10 +633,42 @@ export class ImportarReporteXlsx {
     }
   }
 
+  private async refrescarMapasTipos(
+    contexto: ImportContext,
+    permissionService: PermissionService,
+  ): Promise<void> {
+    const tiposActividad = await this.gestionarTipoActividad.listar(permissionService);
+    contexto.tipoPorNombre.clear();
+    contexto.tipoPorId.clear();
+    for (const item of tiposActividad) {
+      contexto.tipoPorNombre.set(item.nombre.toLowerCase(), item.id);
+      contexto.tipoPorId.set(item.id, item.id);
+    }
+  }
+
+  private async persistirTiposActividad(
+    rows: ParsedTipoActividadImportRow[],
+    permissionService: PermissionService,
+  ): Promise<void> {
+    for (const row of rows) {
+      await this.gestionarTipoActividad.upsertDesdeIntercambio(
+        {
+          id: row.id,
+          codigo: row.codigo ?? undefined,
+          nombre: row.nombre,
+          activo: row.activo,
+          updatedAt: row.updatedAt,
+        },
+        permissionService,
+      );
+    }
+  }
+
   private async persistirOfrendas(
     _contexto: ImportContext,
     evaluaciones: OfrendaEvaluacion[],
     orgsAfectadas: Set<string>,
+    permissionService: PermissionService,
   ): Promise<void> {
     const deviceId = await getOrCreateDeviceId(this.db);
     const now = new Date().toISOString();
@@ -616,7 +677,20 @@ export class ImportarReporteXlsx {
       if (item.accion !== 'insertar' && item.accion !== 'actualizar') {
         continue;
       }
-      if (!item.organizacionId || !item.tipoActividadId) {
+      if (!item.organizacionId) {
+        continue;
+      }
+
+      let tipoActividadId = item.tipoActividadId;
+      if (!tipoActividadId && item.row.tipoActividadNombre) {
+        const tipo = await this.gestionarTipoActividad.resolverPorNombre(
+          item.row.tipoActividadNombre,
+          permissionService,
+        );
+        tipoActividadId = tipo.id;
+      }
+
+      if (!tipoActividadId) {
         continue;
       }
 
@@ -624,7 +698,7 @@ export class ImportarReporteXlsx {
       const ofrenda: Ofrenda = {
         id: item.row.id,
         organizacionId: item.organizacionId,
-        tipoActividadId: item.tipoActividadId,
+        tipoActividadId: tipoActividadId,
         monto: redondearMonto(item.row.monto),
         fecha: item.row.fecha,
         descripcion: item.row.descripcion,

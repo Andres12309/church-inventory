@@ -15,7 +15,7 @@ import type { Modulo } from "../domain/entities/Modulo";
 import type { Rol } from "../domain/entities/Rol";
 import type { Usuario } from "../domain/entities/Usuario";
 import type { IUsuarioRepository } from "../domain/repositories/IUsuarioRepository";
-import { ensureHierarchySeed } from "./ensureHierarchySeed";
+import { ensureAppSeeds } from "./ensureAppSeeds";
 import { hashPin, verifyPinHash } from "./PinHasher";
 import { mapModuloRow, mapRolRow, mapUsuarioRow } from "./UsuarioMapper";
 
@@ -23,11 +23,11 @@ export class SqliteUsuarioRepository implements IUsuarioRepository {
   constructor(private readonly db: SQLiteDatabase) {}
 
   async ensureDefaultAdmin(): Promise<void> {
-    await ensureHierarchySeed(this.db);
+    await ensureAppSeeds(this.db);
   }
 
   async ensurePerfilesDemostracion(): Promise<void> {
-    await ensureHierarchySeed(this.db);
+    await ensureAppSeeds(this.db);
   }
 
   async buscarPorId(id: string): Promise<Usuario | null> {

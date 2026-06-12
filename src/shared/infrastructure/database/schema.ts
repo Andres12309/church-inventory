@@ -128,6 +128,9 @@ export const TiposActividadColumns = {
   CODIGO: 'codigo',
   NOMBRE: 'nombre',
   ACTIVO: 'activo',
+  SYNC_VECTOR: 'sync_vector',
+  UPDATED_AT: 'updated_at',
+  UPDATED_BY_DEVICE: 'updated_by_device',
 } as const;
 
 export const OfrendasColumns = {

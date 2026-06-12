@@ -39,10 +39,19 @@ export type ParsedOfrendaImportRow = {
   readonly updatedAt: string;
 };
 
+export type ParsedTipoActividadImportRow = {
+  readonly id: string;
+  readonly codigo: string | null;
+  readonly nombre: string;
+  readonly activo: boolean;
+  readonly updatedAt: string;
+};
+
 export type ParsedReporteImport = {
   readonly metadatos: ParsedReporteMetadatos;
   readonly bienes: ParsedBienImportRow[];
   readonly ofrendas: ParsedOfrendaImportRow[];
+  readonly tiposActividad: ParsedTipoActividadImportRow[];
 };
 
 const ESTADO_FROM_LABEL: Record<string, BienEstadoValue> = {
@@ -174,12 +183,38 @@ function parseOfrendas(rows: Record<string, unknown>[]): ParsedOfrendaImportRow[
   return parsed;
 }
 
+function parseTiposActividad(rows: Record<string, unknown>[]): ParsedTipoActividadImportRow[] {
+  const parsed: ParsedTipoActividadImportRow[] = [];
+
+  for (const row of rows) {
+    const id = asString(row.ID) ?? asString(row.id_tipo_actividad);
+    const nombre = asString(row.Nombre) ?? asString(row.nombre);
+    if (!id || !nombre) {
+      continue;
+    }
+
+    const activoRaw = asString(row.Activo) ?? asString(row.activo);
+    parsed.push({
+      id,
+      codigo: asString(row.Código) ?? asString(row.codigo),
+      nombre,
+      activo: activoRaw ? activoRaw.toLowerCase() !== 'no' && activoRaw !== '0' : true,
+      updatedAt: parseUpdatedAt(row),
+    });
+  }
+
+  return parsed;
+}
+
 export function parseWorkbookForImport(workbook: XLSX.WorkBook): ParsedReporteImport {
   const metadatos = parseMetadatos(sheetToRows(workbook.Sheets.Metadatos));
   const bienes = parseBienes(sheetToRows(workbook.Sheets.Bienes));
   const ofrendas = parseOfrendas(sheetToRows(workbook.Sheets.Ofrendas));
+  const tiposActividad = parseTiposActividad(
+    sheetToRows(workbook.Sheets['Tipos actividad'] ?? workbook.Sheets.TiposActividad),
+  );
 
-  return { metadatos, bienes, ofrendas };
+  return { metadatos, bienes, ofrendas, tiposActividad };
 }
 
 export function validarFormatoIntercambio(metadatos: ParsedReporteMetadatos): void {

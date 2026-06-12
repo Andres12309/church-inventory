@@ -3,4 +3,7 @@ export type TipoActividad = {
   readonly codigo: string;
   readonly nombre: string;
   readonly activo: boolean;
+  readonly syncVector: string;
+  readonly updatedAt: string;
+  readonly updatedByDevice: string;
 };

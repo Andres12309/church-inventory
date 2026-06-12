@@ -6,6 +6,7 @@ import {
   OrganizacionesColumns,
   SyncOperacion,
   Tables,
+  TiposActividadColumns,
 } from '@/shared/infrastructure/database/schema';
 
 import type { SyncChange } from '../domain/entities/SyncChange';
@@ -39,6 +40,11 @@ export class SyncChangeApplier {
 
     if (tabla === Tables.ORGANIZACIONES) {
       await this.applyOrganizacion(registroId, payload, operacion);
+      return;
+    }
+
+    if (tabla === Tables.TIPOS_ACTIVIDAD) {
+      await this.applyTipoActividad(registroId, payload, operacion);
     }
   }
 
@@ -199,6 +205,54 @@ export class SyncChangeApplier {
         bindValue(payload.nombre),
         bindValue(payload.codigo_interno),
         bindValue(payload.descripcion ?? null),
+        bindValue(payload.activo ?? 1),
+        bindValue(payload.sync_vector ?? '{}'),
+        bindValue(payload.updated_at),
+        bindValue(payload.updated_by_device ?? ''),
+      ],
+    );
+  }
+
+  private async applyTipoActividad(
+    id: string,
+    payload: Record<string, unknown>,
+    operacion: SyncChange['operacion'],
+  ): Promise<void> {
+    if (operacion === SyncOperacion.DELETE) {
+      await this.db.runAsync(
+        `UPDATE ${Tables.TIPOS_ACTIVIDAD}
+         SET ${TiposActividadColumns.ACTIVO} = 0,
+             ${TiposActividadColumns.UPDATED_AT} = ?,
+             ${TiposActividadColumns.UPDATED_BY_DEVICE} = ?,
+             ${TiposActividadColumns.SYNC_VECTOR} = ?
+         WHERE ${TiposActividadColumns.ID} = ?`,
+        [
+          bindValue(payload.updated_at ?? new Date().toISOString()),
+          bindValue(payload.updated_by_device ?? ''),
+          bindValue(payload.sync_vector ?? '{}'),
+          id,
+        ],
+      );
+      return;
+    }
+
+    await this.db.runAsync(
+      `INSERT INTO ${Tables.TIPOS_ACTIVIDAD} (
+        ${TiposActividadColumns.ID}, ${TiposActividadColumns.CODIGO}, ${TiposActividadColumns.NOMBRE},
+        ${TiposActividadColumns.ACTIVO}, ${TiposActividadColumns.SYNC_VECTOR},
+        ${TiposActividadColumns.UPDATED_AT}, ${TiposActividadColumns.UPDATED_BY_DEVICE}
+      ) VALUES (?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(${TiposActividadColumns.ID}) DO UPDATE SET
+        ${TiposActividadColumns.CODIGO} = excluded.${TiposActividadColumns.CODIGO},
+        ${TiposActividadColumns.NOMBRE} = excluded.${TiposActividadColumns.NOMBRE},
+        ${TiposActividadColumns.ACTIVO} = excluded.${TiposActividadColumns.ACTIVO},
+        ${TiposActividadColumns.SYNC_VECTOR} = excluded.${TiposActividadColumns.SYNC_VECTOR},
+        ${TiposActividadColumns.UPDATED_AT} = excluded.${TiposActividadColumns.UPDATED_AT},
+        ${TiposActividadColumns.UPDATED_BY_DEVICE} = excluded.${TiposActividadColumns.UPDATED_BY_DEVICE}`,
+      [
+        id,
+        bindValue(payload.codigo),
+        bindValue(payload.nombre),
         bindValue(payload.activo ?? 1),
         bindValue(payload.sync_vector ?? '{}'),
         bindValue(payload.updated_at),

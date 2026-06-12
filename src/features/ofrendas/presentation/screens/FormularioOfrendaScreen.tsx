@@ -19,6 +19,7 @@ import {
 import { SocialVoiceInput } from '@/shared/presentation/ui/SocialVoiceInput';
 
 import { obtenerFechaHoyIso } from '../../application/services/OfrendaAccessPolicy';
+import { TiposActividadSheet } from '../components/TiposActividadSheet';
 import { useOfrendasUseCases } from '../hooks/useOfrendasUseCases';
 import { useOfrendasStore } from '../store/ofrendasStore';
 
@@ -32,13 +33,14 @@ export function FormularioOfrendaScreen() {
   const permissionService = useAuthStore((s) => s.permissionService);
   const tieneAcceso = useAuthStore((s) => s.tieneAcceso(ModuloCodigo.OFRENDAS));
 
-  const { consultarFinanzas, registrarRecaudacion } = useOfrendasUseCases();
+  const { consultarFinanzas, registrarRecaudacion, gestionarTipoActividad } = useOfrendasUseCases();
 
   const tiposActividad = useOfrendasStore((s) => s.tiposActividad);
   const formulario = useOfrendasStore((s) => s.formulario);
   const isSaving = useOfrendasStore((s) => s.isSaving);
   const errorMessage = useOfrendasStore((s) => s.errorMessage);
   const cargarCatalogo = useOfrendasStore((s) => s.cargarCatalogo);
+  const crearTipoActividad = useOfrendasStore((s) => s.crearTipoActividad);
   const iniciarFormulario = useOfrendasStore((s) => s.iniciarFormulario);
   const actualizarFormulario = useOfrendasStore((s) => s.actualizarFormulario);
   const guardarFormulario = useOfrendasStore((s) => s.guardarFormulario);
@@ -46,6 +48,7 @@ export function FormularioOfrendaScreen() {
   const clearError = useOfrendasStore((s) => s.clearError);
 
   const [isLoading, setIsLoading] = useState(isEditing);
+  const [tiposVisible, setTiposVisible] = useState(false);
 
   useEffect(() => {
     if (!permissionService) {
@@ -163,6 +166,17 @@ export function FormularioOfrendaScreen() {
     clearError();
   };
 
+  const handleCrearTipo = async (nombre: string) => {
+    if (!permissionService) {
+      return;
+    }
+    const tipo = await crearTipoActividad(nombre, permissionService, gestionarTipoActividad);
+    updateField('tipoActividadId', tipo.id);
+    setTiposVisible(false);
+  };
+
+  const sinTipos = tiposActividad.length === 0;
+
   if (!tieneAcceso) {
     return (
       <SocialFormScreen keyboard={false}>
@@ -199,11 +213,30 @@ export function FormularioOfrendaScreen() {
         </SocialFormField>
 
         <SocialFormField label="Tipo de actividad">
-          <PillFilterRow
-            options={tiposActividad.map((tipo) => ({ id: tipo.id, label: tipo.nombre }))}
-            selectedId={formulario.tipoActividadId}
-            onSelect={(id) => id && updateField('tipoActividadId', id)}
-          />
+          {sinTipos ? (
+            <View style={styles.sinTipos}>
+              <SocialEmpty
+                icon="🏷️"
+                title="Sin tipos de actividad"
+                message="Crea al menos un tipo para clasificar este ingreso."
+              />
+              <SocialPrimaryButton
+                label="Gestionar tipos"
+                onPress={() => setTiposVisible(true)}
+              />
+            </View>
+          ) : (
+            <>
+              <PillFilterRow
+                options={tiposActividad.map((tipo) => ({ id: tipo.id, label: tipo.nombre }))}
+                selectedId={formulario.tipoActividadId || null}
+                onSelect={(id) => id && updateField('tipoActividadId', id)}
+              />
+              <Pressable onPress={() => setTiposVisible(true)} style={styles.gestionarTipos}>
+                <Text style={styles.gestionarTiposText}>+ Crear otro tipo</Text>
+              </Pressable>
+            </>
+          )}
         </SocialFormField>
       </SocialCard>
 
@@ -248,6 +281,14 @@ export function FormularioOfrendaScreen() {
           disabled={isSaving}
         />
       ) : null}
+
+      <TiposActividadSheet
+        visible={tiposVisible}
+        onClose={() => setTiposVisible(false)}
+        tipos={tiposActividad}
+        isSaving={isSaving}
+        onCrear={handleCrearTipo}
+      />
     </SocialFormScreen>
   );
 }
@@ -269,5 +310,8 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   hoyBtnText: { color: '#FFFFFF', fontSize: 13, fontWeight: '700' },
+  sinTipos: { gap: 12 },
+  gestionarTipos: { marginTop: 10, alignSelf: 'flex-start' },
+  gestionarTiposText: { color: PremiumPalette.primary, fontSize: 13, fontWeight: '700' },
   error: { color: PremiumPalette.danger, fontSize: 13, textAlign: 'center' },
 });

@@ -3,6 +3,7 @@ import { useMemo } from 'react';
 import { useSQLiteContext } from 'expo-sqlite';
 
 import { SqliteBienRepository } from '@/features/bienes/infrastructure/SqliteBienRepository';
+import { GestionarTipoActividad } from '@/features/ofrendas/application/use-cases/GestionarTipoActividad';
 import { SqliteOfrendaRepository } from '@/features/ofrendas/infrastructure/SqliteOfrendaRepository';
 import { SqliteOrganizacionRepository } from '@/features/organizaciones/infrastructure/SqliteOrganizacionRepository';
 import { SqliteSyncRepository } from '@/features/sync/infrastructure/SqliteSyncRepository';
@@ -23,6 +24,11 @@ export function createReportesUseCases(db: SQLiteDatabase) {
   const ofrendaRepository = new SqliteOfrendaRepository(db);
   const consolidationTrigger = createConsolidationTrigger(db);
   const syncRepository = new SqliteSyncRepository(db);
+  const gestionarTipoActividad = new GestionarTipoActividad(
+    ofrendaRepository,
+    db,
+    syncRepository,
+  );
 
   return {
     listarReportesEnAlcance: new ListarReportesEnAlcance(reporteRepository, organizacionRepository),
@@ -35,6 +41,7 @@ export function createReportesUseCases(db: SQLiteDatabase) {
       bienRepository,
       ofrendaRepository,
       organizacionRepository,
+      gestionarTipoActividad,
       db,
       consolidationTrigger,
       syncRepository,

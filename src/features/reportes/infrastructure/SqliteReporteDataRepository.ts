@@ -111,7 +111,7 @@ export class SqliteReporteDataRepository implements IReporteDataRepository {
         bienes: [],
         ofrendas: [],
         resumen: [],
-        tiposActividad: [],
+        catalogoTiposActividad: [],
       };
     }
 
@@ -123,8 +123,19 @@ export class SqliteReporteDataRepository implements IReporteDataRepository {
       this.cargarOfrendas(placeholders, organizacionIds, filtros),
       this.cargarAggregates(placeholders, organizacionIds),
       this.cargarValoresInventario(placeholders, organizacionIds),
-      this.db.getAllAsync<{ nombre: string }>(
-        `SELECT ${TiposActividadColumns.NOMBRE} AS nombre
+      this.db.getAllAsync<{
+        id: string;
+        codigo: string;
+        nombre: string;
+        activo: number;
+        updated_at: string;
+      }>(
+        `SELECT
+          ${TiposActividadColumns.ID} AS id,
+          ${TiposActividadColumns.CODIGO} AS codigo,
+          ${TiposActividadColumns.NOMBRE} AS nombre,
+          ${TiposActividadColumns.ACTIVO} AS activo,
+          ${TiposActividadColumns.UPDATED_AT} AS updated_at
          FROM ${Tables.TIPOS_ACTIVIDAD}
          WHERE ${TiposActividadColumns.ACTIVO} = 1
          ORDER BY ${TiposActividadColumns.NOMBRE} COLLATE NOCASE ASC`,
@@ -133,9 +144,15 @@ export class SqliteReporteDataRepository implements IReporteDataRepository {
 
     const valorPorOrg = new Map(valoresInventario.map((row) => [row.organizacion_id, row.valor_total]));
     const resumen = this.construirResumen(aggregates, valorPorOrg);
-    const tiposActividad = tiposRows.map((row) => row.nombre);
+    const catalogoTiposActividad = tiposRows.map((row) => ({
+      id: row.id,
+      codigo: row.codigo,
+      nombre: row.nombre,
+      activo: row.activo === 1,
+      updatedAt: row.updated_at,
+    }));
 
-    return { organizaciones, bienes, ofrendas, resumen, tiposActividad };
+    return { organizaciones, bienes, ofrendas, resumen, catalogoTiposActividad };
   }
 
   private async cargarOrganizaciones(placeholders: string, orgIds: string[]): Promise<OrgExportRow[]> {

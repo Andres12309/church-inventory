@@ -23,6 +23,9 @@ type TipoActividadRow = {
   codigo: string;
   nombre: string;
   activo: number;
+  sync_vector: string;
+  updated_at: string;
+  updated_by_device: string;
 };
 
 export function mapOfrendaRow(row: OfrendaRow): Ofrenda {
@@ -46,6 +49,9 @@ export function mapTipoActividadRow(row: TipoActividadRow): TipoActividad {
     codigo: row.codigo,
     nombre: row.nombre,
     activo: row.activo === 1,
+    syncVector: row.sync_vector ?? '{}',
+    updatedAt: row.updated_at ?? new Date().toISOString(),
+    updatedByDevice: row.updated_by_device ?? '',
   };
 }
 

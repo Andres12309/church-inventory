@@ -10,6 +10,7 @@ import {
   SyncMetaColumns,
   SyncSessionsColumns,
   Tables,
+  TiposActividadColumns,
 } from '@/shared/infrastructure/database/schema';
 import { getNextLamportClock } from '@/shared/infrastructure/sync/SyncContext';
 
@@ -292,6 +293,7 @@ export class SqliteSyncRepository implements ISyncRepository {
       [Tables.BIENES]: Tables.BIENES,
       [Tables.OFRENDAS]: Tables.OFRENDAS,
       [Tables.ORGANIZACIONES]: Tables.ORGANIZACIONES,
+      [Tables.TIPOS_ACTIVIDAD]: Tables.TIPOS_ACTIVIDAD,
     };
 
     const table = tableMap[tabla];
@@ -304,19 +306,33 @@ export class SqliteSyncRepository implements ISyncRepository {
         ? BienesColumns
         : tabla === Tables.OFRENDAS
           ? OfrendasColumns
-          : OrganizacionesColumns;
+          : tabla === Tables.TIPOS_ACTIVIDAD
+            ? TiposActividadColumns
+            : OrganizacionesColumns;
 
-    const row = await this.db.getFirstAsync<{
-      updated_at: string;
-      updated_by_device: string;
-      deleted_at: string | null;
-      sync_vector: string;
-    }>(
-      `SELECT ${cols.UPDATED_AT} AS updated_at, ${cols.UPDATED_BY_DEVICE} AS updated_by_device,
-              ${cols.DELETED_AT} AS deleted_at, ${cols.SYNC_VECTOR} AS sync_vector
-       FROM ${table} WHERE ${cols.ID} = ?`,
-      [registroId],
-    );
+    const row =
+      tabla === Tables.TIPOS_ACTIVIDAD
+        ? await this.db.getFirstAsync<{
+            updated_at: string;
+            updated_by_device: string;
+            sync_vector: string;
+          }>(
+            `SELECT ${cols.UPDATED_AT} AS updated_at, ${cols.UPDATED_BY_DEVICE} AS updated_by_device,
+                    ${cols.SYNC_VECTOR} AS sync_vector
+             FROM ${table} WHERE ${cols.ID} = ?`,
+            [registroId],
+          )
+        : await this.db.getFirstAsync<{
+            updated_at: string;
+            updated_by_device: string;
+            deleted_at?: string | null;
+            sync_vector: string;
+          }>(
+            `SELECT ${cols.UPDATED_AT} AS updated_at, ${cols.UPDATED_BY_DEVICE} AS updated_by_device,
+                    ${(cols as typeof BienesColumns).DELETED_AT} AS deleted_at, ${cols.SYNC_VECTOR} AS sync_vector
+             FROM ${table} WHERE ${cols.ID} = ?`,
+            [registroId],
+          );
 
     if (!row) {
       return null;
@@ -330,11 +346,16 @@ export class SqliteSyncRepository implements ISyncRepository {
       lamport = 0;
     }
 
+    const deletedAt =
+      tabla === Tables.TIPOS_ACTIVIDAD
+        ? null
+        : ((row as { deleted_at?: string | null }).deleted_at ?? null);
+
     return {
       lamportClock: lamport,
       updatedAt: row.updated_at,
       deviceId: row.updated_by_device,
-      deletedAt: row.deleted_at,
+      deletedAt,
     };
   }
 }
@@ -381,6 +402,13 @@ export async function fetchRowPayload(
   if (tabla === Tables.ORGANIZACIONES) {
     return db.getFirstAsync<Record<string, unknown>>(
       `SELECT * FROM ${Tables.ORGANIZACIONES} WHERE ${OrganizacionesColumns.ID} = ?`,
+      [registroId],
+    );
+  }
+
+  if (tabla === Tables.TIPOS_ACTIVIDAD) {
+    return db.getFirstAsync<Record<string, unknown>>(
+      `SELECT * FROM ${Tables.TIPOS_ACTIVIDAD} WHERE ${TiposActividadColumns.ID} = ?`,
       [registroId],
     );
   }
