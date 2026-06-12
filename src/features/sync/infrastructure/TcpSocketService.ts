@@ -9,27 +9,47 @@ import {
   SYNC_TCP_PORT,
 } from '../domain/constants/SyncConstants';
 
+function chunkToString(chunk: string | Uint8Array): string {
+  if (typeof chunk === 'string') {
+    return chunk;
+  }
+
+  const maybeBuffer = chunk as Uint8Array & { toString?: (encoding: string) => string };
+  if (typeof maybeBuffer.toString === 'function') {
+    return maybeBuffer.toString('utf8');
+  }
+
+  return new TextDecoder('utf-8').decode(chunk);
+}
+
 function createConnection(socket: Socket): SyncSocketConnection {
   let buffer = '';
+  const inbox: SyncProtocolMessage[] = [];
   const waiters: Array<{
     resolve: (message: SyncProtocolMessage) => void;
     reject: (error: Error) => void;
     timer: ReturnType<typeof setTimeout>;
   }> = [];
 
-  const flushWaiter = (error?: Error, message?: SyncProtocolMessage) => {
-    const waiter = waiters.shift();
-    if (!waiter) {
-      return;
-    }
-    clearTimeout(waiter.timer);
-    if (error) {
+  const rejectAllWaiters = (error: Error) => {
+    while (waiters.length > 0) {
+      const waiter = waiters.shift();
+      if (!waiter) {
+        break;
+      }
+      clearTimeout(waiter.timer);
       waiter.reject(error);
+    }
+  };
+
+  const deliverMessage = (message: SyncProtocolMessage) => {
+    const waiter = waiters.shift();
+    if (waiter) {
+      clearTimeout(waiter.timer);
+      waiter.resolve(message);
       return;
     }
-    if (message) {
-      waiter.resolve(message);
-    }
+    inbox.push(message);
   };
 
   const processBuffer = () => {
@@ -48,25 +68,27 @@ function createConnection(socket: Socket): SyncSocketConnection {
 
       try {
         const parsed = JSON.parse(line) as SyncProtocolMessage;
-        flushWaiter(undefined, parsed);
+        deliverMessage(parsed);
       } catch {
-        flushWaiter(new SyncError('Mensaje JSON inválido recibido por socket'));
+        rejectAllWaiters(new SyncError('Mensaje JSON inválido recibido por socket'));
+        return;
       }
     }
   };
 
   socket.on('data', (chunk: string | Uint8Array) => {
-    buffer +=
-      typeof chunk === 'string' ? chunk : new TextDecoder('utf-8').decode(chunk);
+    buffer += chunkToString(chunk);
     processBuffer();
   });
 
   socket.on('error', (error: Error) => {
-    flushWaiter(error);
+    inbox.length = 0;
+    rejectAllWaiters(error);
   });
 
   socket.on('close', () => {
-    flushWaiter(new SyncError('Conexión TCP cerrada inesperadamente'));
+    inbox.length = 0;
+    rejectAllWaiters(new SyncError('Conexión TCP cerrada inesperadamente'));
   });
 
   return {
@@ -86,13 +108,25 @@ function createConnection(socket: Socket): SyncSocketConnection {
       }),
     receive: () =>
       new Promise<SyncProtocolMessage>((resolve, reject) => {
+        const pending = inbox.shift();
+        if (pending) {
+          resolve(pending);
+          return;
+        }
+
         const timer = setTimeout(() => {
+          const index = waiters.findIndex((waiter) => waiter.reject === reject);
+          if (index >= 0) {
+            waiters.splice(index, 1);
+          }
           reject(new SyncError('Timeout esperando mensaje del peer'));
         }, SYNC_MESSAGE_TIMEOUT_MS);
 
         waiters.push({ resolve, reject, timer });
       }),
     close: () => {
+      inbox.length = 0;
+      rejectAllWaiters(new SyncError('Conexión TCP cerrada'));
       try {
         socket.destroy();
       } catch {

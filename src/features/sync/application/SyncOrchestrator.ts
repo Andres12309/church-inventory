@@ -184,24 +184,18 @@ export class SyncOrchestrator {
       onProgress: this.incomingProgressCallback ?? undefined,
     };
 
-    await this.syncRepository.crearSesion({
-      id: sessionId,
-      peerDeviceId: 'pending',
-      peerDeviceName: 'Dispositivo remoto',
-      startedAt,
-      finishedAt: null,
-      status: SyncSessionStatus.PENDING,
-      recordsSent: 0,
-      recordsReceived: 0,
-      conflictsResolved: 0,
-    });
-
     try {
       options.onProgress?.({ phase: 'handshake', message: 'Conexión entrante: validando peer...' });
 
       const stats = await this.ejecutarProtocolo(connection, context, undefined, options);
 
-      await this.syncRepository.finalizarSesion(sessionId, SyncSessionStatus.COMPLETED, {
+      await this.syncRepository.crearSesion({
+        id: sessionId,
+        peerDeviceId: stats.peerDeviceId ?? 'unknown',
+        peerDeviceName: stats.peerDeviceName ?? 'Dispositivo remoto',
+        startedAt,
+        finishedAt: new Date().toISOString(),
+        status: SyncSessionStatus.COMPLETED,
         recordsSent: stats.recordsSent,
         recordsReceived: stats.recordsReceived,
         conflictsResolved: stats.conflictsResolved,
@@ -219,7 +213,13 @@ export class SyncOrchestrator {
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Sesión entrante fallida';
       await this.syncRepository
-        .finalizarSesion(sessionId, SyncSessionStatus.FAILED, {
+        .crearSesion({
+          id: sessionId,
+          peerDeviceId: 'unknown',
+          peerDeviceName: 'Dispositivo remoto',
+          startedAt,
+          finishedAt: new Date().toISOString(),
+          status: SyncSessionStatus.FAILED,
           recordsSent: 0,
           recordsReceived: 0,
           conflictsResolved: 0,

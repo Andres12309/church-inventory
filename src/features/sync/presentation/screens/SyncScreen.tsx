@@ -1,6 +1,6 @@
 import * as Device from 'expo-device';
 import * as Network from 'expo-network';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Platform,
@@ -27,6 +27,7 @@ import { PrimaryButton } from '@/shared/presentation/ui/PrimaryButton';
 import { SocialHeader } from '@/shared/presentation/ui/socialUi';
 
 import type { DiscoveredPeer } from '../../domain/entities/DiscoveredPeer';
+import { SYNC_PEER_SCAN_TIMEOUT_MS } from '../../domain/constants/SyncConstants';
 import { SyncError } from '../../domain/errors/SyncError';
 import { useSyncUseCases } from '../hooks/useSyncUseCases';
 import { useSyncStore } from '../store/syncStore';
@@ -56,6 +57,10 @@ function mapSyncErrorMessage(error: unknown): string {
 
   if (message.includes('Device ID') || message.includes('HANDSHAKE')) {
     return 'No se pudo validar el dispositivo remoto. Intenta buscar de nuevo e iniciar sync.';
+  }
+
+  if (message.includes('Timeout esperando mensaje') || message.includes('Timeout al conectar')) {
+    return 'El otro dispositivo no respondió a tiempo. Activa "Visible en la red" en ambos equipos e intenta de nuevo.';
   }
 
   if (message.includes('ECONNREFUSED') || message.includes('timeout') || message.includes('Conectando')) {
@@ -98,6 +103,26 @@ export function SyncScreen() {
   const addPeer = useSyncStore((s) => s.addPeer);
   const resetRuntime = useSyncStore((s) => s.resetRuntime);
   const [showTechnical, setShowTechnical] = useState(false);
+  const scanTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const clearScanTimeout = useCallback(() => {
+    if (scanTimeoutRef.current) {
+      clearTimeout(scanTimeoutRef.current);
+      scanTimeoutRef.current = null;
+    }
+  }, []);
+
+  const finalizarBusqueda = useCallback(
+    async (idleMessage?: string) => {
+      clearScanTimeout();
+      await orchestrator.detenerBusqueda();
+      setScanning(false);
+      if (idleMessage) {
+        setProgress('idle', idleMessage);
+      }
+    },
+    [clearScanTimeout, orchestrator, setProgress, setScanning],
+  );
 
   const refreshNetwork = useCallback(async () => {
     try {
@@ -111,11 +136,12 @@ export function SyncScreen() {
   useEffect(() => {
     void refreshNetwork();
     return () => {
+      clearScanTimeout();
       void orchestrator.detenerVisibilidad().catch(() => undefined);
       void orchestrator.detenerBusqueda().catch(() => undefined);
       resetRuntime();
     };
-  }, [orchestrator, refreshNetwork, resetRuntime]);
+  }, [clearScanTimeout, orchestrator, refreshNetwork, resetRuntime]);
 
   const buildContext = useCallback(async () => {
     if (!usuario || !rol) {
@@ -158,25 +184,47 @@ export function SyncScreen() {
   const handleBuscar = async () => {
     setError(null);
     setScanning(true);
+    setProgress('idle', `Buscando dispositivos cercanos (máx. ${SYNC_PEER_SCAN_TIMEOUT_MS / 1000}s)...`);
     useSyncStore.getState().setPeers([]);
+    clearScanTimeout();
 
     try {
       const deviceId = await getOrCreateDeviceId(db);
       await orchestrator.buscarPeers((peer) => addPeer(peer), deviceId);
+
+      scanTimeoutRef.current = setTimeout(() => {
+        const count = useSyncStore.getState().peers.length;
+        void finalizarBusqueda(
+          count > 0
+            ? `Búsqueda finalizada: ${count} dispositivo(s) encontrado(s).`
+            : 'Búsqueda finalizada sin resultados. Activa "Visible en la red" en el otro equipo e intenta de nuevo.',
+        );
+      }, SYNC_PEER_SCAN_TIMEOUT_MS);
     } catch (error) {
+      clearScanTimeout();
       setError(mapSyncErrorMessage(error));
       setScanning(false);
     }
   };
 
   const handleDetenerBusqueda = async () => {
-    await orchestrator.detenerBusqueda();
-    setScanning(false);
+    const count = useSyncStore.getState().peers.length;
+    await finalizarBusqueda(
+      count > 0
+        ? `Escaneo detenido: ${count} dispositivo(s) encontrado(s).`
+        : 'Escaneo detenido.',
+    );
   };
 
   const handleSincronizar = async (peer: DiscoveredPeer) => {
     if (isSyncing) {
       return;
+    }
+
+    if (isScanning) {
+      clearScanTimeout();
+      await orchestrator.detenerBusqueda();
+      setScanning(false);
     }
 
     setError(null);
@@ -189,8 +237,11 @@ export function SyncScreen() {
           setProgress(update.phase, update.message, update.recordsProcessed, update.recordsTotal);
         },
       });
+      setProgress('success', 'Sincronización completada');
     } catch (error) {
-      setError(mapSyncErrorMessage(error));
+      const mapped = mapSyncErrorMessage(error);
+      setError(mapped);
+      setProgress('failed', mapped);
     } finally {
       setSyncing(false);
     }
@@ -271,7 +322,7 @@ export function SyncScreen() {
             label={isScanning ? 'Escaneando...' : 'Buscar dispositivos cercanos'}
             onPress={() => void handleBuscar()}
             disabled={isScanning || isSyncing}
-            loading={isScanning}
+            loading={isScanning && !isSyncing}
           />
 
           {isScanning ? (
