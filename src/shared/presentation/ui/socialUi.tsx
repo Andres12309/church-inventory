@@ -233,6 +233,8 @@ export function PillFilterRow({
       horizontal
       showsHorizontalScrollIndicator={false}
       contentContainerStyle={styles.pillRow}
+      style={styles.pillScrollHost}
+      keyboardShouldPersistTaps="handled"
     >
       {allowNull ? (
         <Pressable
@@ -576,7 +578,7 @@ type SocialListCardProps = {
   title: string;
   subtitle?: string;
   meta?: string;
-  trailing?: string;
+  trailing?: ReactNode;
   trailingAccent?: boolean;
   onPress?: () => void;
   left?: ReactNode;
@@ -606,9 +608,13 @@ export function SocialListCard({
         {meta ? <Text style={styles.listCardMeta}>{meta}</Text> : null}
       </View>
       {trailing ? (
-        <Text style={[styles.listCardTrailing, trailingAccent && styles.listCardTrailingAccent]}>
-          {trailing}
-        </Text>
+        typeof trailing === 'string' ? (
+          <Text style={[styles.listCardTrailing, trailingAccent && styles.listCardTrailingAccent]}>
+            {trailing}
+          </Text>
+        ) : (
+          trailing
+        )
       ) : null}
     </View>
   );
@@ -700,7 +706,8 @@ const styles = StyleSheet.create({
     borderRadius: 20,
   },
   orgBadgeText: { color: PremiumPalette.textSoftOnDark, fontSize: 11, fontWeight: '700' },
-  pillRow: { gap: 8, paddingVertical: 4, alignItems: 'center' },
+  pillRow: { gap: 8, paddingVertical: 2, alignItems: 'center' },
+  pillScrollHost: { flexGrow: 0, flexShrink: 0 },
   pill: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20 },
   pillOn: { backgroundColor: PremiumPalette.primary },
   pillOff: { backgroundColor: PremiumPalette.surface },

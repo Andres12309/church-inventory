@@ -131,13 +131,14 @@ export class SyncChangeApplier {
     await this.db.runAsync(
       `INSERT INTO ${Tables.OFRENDAS} (
         ${OfrendasColumns.ID}, ${OfrendasColumns.ORGANIZACION_ID}, ${OfrendasColumns.TIPO_ACTIVIDAD_ID},
-        ${OfrendasColumns.MONTO}, ${OfrendasColumns.FECHA}, ${OfrendasColumns.DESCRIPCION},
+        ${OfrendasColumns.NATURALEZA}, ${OfrendasColumns.MONTO}, ${OfrendasColumns.FECHA}, ${OfrendasColumns.DESCRIPCION},
         ${OfrendasColumns.SYNC_VECTOR}, ${OfrendasColumns.UPDATED_AT}, ${OfrendasColumns.UPDATED_BY_DEVICE},
         ${OfrendasColumns.DELETED_AT}
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)
       ON CONFLICT(${OfrendasColumns.ID}) DO UPDATE SET
         ${OfrendasColumns.ORGANIZACION_ID} = excluded.${OfrendasColumns.ORGANIZACION_ID},
         ${OfrendasColumns.TIPO_ACTIVIDAD_ID} = excluded.${OfrendasColumns.TIPO_ACTIVIDAD_ID},
+        ${OfrendasColumns.NATURALEZA} = excluded.${OfrendasColumns.NATURALEZA},
         ${OfrendasColumns.MONTO} = excluded.${OfrendasColumns.MONTO},
         ${OfrendasColumns.FECHA} = excluded.${OfrendasColumns.FECHA},
         ${OfrendasColumns.DESCRIPCION} = excluded.${OfrendasColumns.DESCRIPCION},
@@ -149,6 +150,7 @@ export class SyncChangeApplier {
         id,
         bindValue(payload.organizacion_id),
         bindValue(payload.tipo_actividad_id),
+        bindValue(payload.naturaleza ?? 'ingreso'),
         monto,
         bindValue(payload.fecha),
         bindValue(payload.descripcion ?? null),
@@ -239,12 +241,13 @@ export class SyncChangeApplier {
     await this.db.runAsync(
       `INSERT INTO ${Tables.TIPOS_ACTIVIDAD} (
         ${TiposActividadColumns.ID}, ${TiposActividadColumns.CODIGO}, ${TiposActividadColumns.NOMBRE},
-        ${TiposActividadColumns.ACTIVO}, ${TiposActividadColumns.SYNC_VECTOR},
+        ${TiposActividadColumns.NATURALEZA}, ${TiposActividadColumns.ACTIVO}, ${TiposActividadColumns.SYNC_VECTOR},
         ${TiposActividadColumns.UPDATED_AT}, ${TiposActividadColumns.UPDATED_BY_DEVICE}
-      ) VALUES (?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(${TiposActividadColumns.ID}) DO UPDATE SET
         ${TiposActividadColumns.CODIGO} = excluded.${TiposActividadColumns.CODIGO},
         ${TiposActividadColumns.NOMBRE} = excluded.${TiposActividadColumns.NOMBRE},
+        ${TiposActividadColumns.NATURALEZA} = excluded.${TiposActividadColumns.NATURALEZA},
         ${TiposActividadColumns.ACTIVO} = excluded.${TiposActividadColumns.ACTIVO},
         ${TiposActividadColumns.SYNC_VECTOR} = excluded.${TiposActividadColumns.SYNC_VECTOR},
         ${TiposActividadColumns.UPDATED_AT} = excluded.${TiposActividadColumns.UPDATED_AT},
@@ -253,6 +256,7 @@ export class SyncChangeApplier {
         id,
         bindValue(payload.codigo),
         bindValue(payload.nombre),
+        bindValue(payload.naturaleza ?? 'ingreso'),
         bindValue(payload.activo ?? 1),
         bindValue(payload.sync_vector ?? '{}'),
         bindValue(payload.updated_at),

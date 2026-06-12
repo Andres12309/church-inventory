@@ -5,6 +5,7 @@ import { useSQLiteContext } from 'expo-sqlite';
 import { useAuthStore } from '@/features/auth/presentation/store/authStore';
 import { BIENES_ROUTES } from '@/features/bienes/presentation/routes';
 import { OFRENDAS_ROUTES } from '@/features/ofrendas/presentation/routes';
+import { FinanzaNaturaleza } from '@/features/ofrendas/domain/entities/FinanzaNaturaleza';
 import { ORGANIZACIONES_ROUTES } from '@/features/organizaciones/presentation/routes';
 import { REPORTES_ROUTES } from '@/features/reportes/presentation/routes';
 import { SYNC_ROUTES } from '@/features/sync/presentation/routes';
@@ -85,7 +86,13 @@ export function useQuickActionsList() {
         id: 'nuevo-ingreso',
         icon: '💰',
         label: 'Registrar ingreso',
-        onPress: () => router.push(OFRENDAS_ROUTES.nuevo(orgId)),
+        onPress: () => router.push(OFRENDAS_ROUTES.nuevo(orgId, FinanzaNaturaleza.INGRESO)),
+      });
+      items.push({
+        id: 'nuevo-gasto',
+        icon: '📤',
+        label: 'Registrar gasto',
+        onPress: () => router.push(OFRENDAS_ROUTES.nuevo(orgId, FinanzaNaturaleza.EGRESO)),
       });
       items.push({
         id: 'finanzas',

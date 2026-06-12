@@ -1,5 +1,5 @@
 import { useRouter } from "expo-router";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   KeyboardAvoidingView,
   Platform,
@@ -18,6 +18,7 @@ import { PremiumPalette } from "@/shared/presentation/ui/premiumPalette";
 import { SocialCard, SocialScreen } from "@/shared/presentation/ui/socialUi";
 
 import { InvalidPinError } from "../../domain/errors/InvalidPinError";
+import { UserNotFoundError } from "../../domain/errors/UserNotFoundError";
 import { getRememberedUsernames, removeRememberedUsername } from "../../infrastructure/RememberedUsernamesStorage";
 import { LoginUsernameField } from "../components/LoginUsernameField";
 import { PIN_PAD_LENGTH, PinPad } from "../components/PinPad";
@@ -40,6 +41,7 @@ export function LoginScreen() {
   const [rememberMe, setRememberMe] = useState(false);
   const [rememberedUsernames, setRememberedUsernames] = useState<string[]>([]);
   const [bootstrapping, setBootstrapping] = useState(true);
+  const loginAttemptRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -75,28 +77,38 @@ export function LoginScreen() {
   const canSubmit = username.trim().length > 0 && pin.length === PIN_PAD_LENGTH;
 
   const handleLogin = useCallback(async () => {
-    if (!canSubmit) {
+    if (!canSubmit || isLoading) {
       return;
     }
 
     try {
       await login(username.trim(), pin, rememberMe, autenticarConPin);
+      loginAttemptRef.current = null;
       router.replace(AUTH_ROUTES.protectedHome);
     } catch (error) {
-      if (error instanceof InvalidPinError) {
+      if (error instanceof InvalidPinError || error instanceof UserNotFoundError) {
         setPin("");
       }
     }
-  }, [autenticarConPin, canSubmit, login, pin, rememberMe, router, username]);
+  }, [autenticarConPin, canSubmit, isLoading, login, pin, rememberMe, router, username]);
 
   useEffect(() => {
-    if (canSubmit && !isLoading) {
-      void handleLogin();
+    if (!canSubmit || isLoading) {
+      return;
     }
-  }, [canSubmit, handleLogin, isLoading]);
+
+    const attemptKey = `${username.trim().toLowerCase()}:${pin}`;
+    if (loginAttemptRef.current === attemptKey) {
+      return;
+    }
+
+    loginAttemptRef.current = attemptKey;
+    void handleLogin();
+  }, [canSubmit, handleLogin, isLoading, pin, username]);
 
   const handleUsernameChange = (nextUsername: string) => {
     setUsername(nextUsername);
+    loginAttemptRef.current = null;
     if (errorMessage) {
       clearError();
     }
@@ -104,6 +116,7 @@ export function LoginScreen() {
 
   const handlePinChange = (nextPin: string) => {
     setPin(nextPin);
+    loginAttemptRef.current = null;
     if (errorMessage) {
       clearError();
     }

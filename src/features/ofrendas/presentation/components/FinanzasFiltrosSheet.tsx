@@ -22,9 +22,11 @@ type FinanzasFiltrosSheetProps = {
   onOrganizacionChange: (id: string | null) => void;
   puedeElegirOrganizacion: boolean;
   orgLabel?: string;
-  totalRecaudado: number;
+  totalIngresos: number;
+  totalEgresos: number;
+  saldo: number;
   totalesPorTipo: { tipoActividadId: string; total: number }[];
-  tiposMap: Record<string, { nombre: string }>;
+  tiposMap: Record<string, { nombre: string; naturaleza?: string }>;
 };
 
 export function FinanzasFiltrosSheet({
@@ -39,7 +41,9 @@ export function FinanzasFiltrosSheet({
   onOrganizacionChange,
   puedeElegirOrganizacion,
   orgLabel,
-  totalRecaudado,
+  totalIngresos,
+  totalEgresos,
+  saldo,
   totalesPorTipo,
   tiposMap,
 }: FinanzasFiltrosSheetProps) {
@@ -86,9 +90,26 @@ export function FinanzasFiltrosSheet({
             </View>
           </View>
 
-          <View style={styles.totalCard}>
-            <Text style={styles.totalLabel}>Total en el período</Text>
-            <Text style={styles.totalValue}>{formatearMonto(totalRecaudado)}</Text>
+          <View style={styles.resumenRow}>
+            <View style={[styles.resumenCard, styles.ingresosCard]}>
+              <Text style={styles.resumenLabel}>Ingresos</Text>
+              <Text style={[styles.resumenValue, styles.ingresosValue]}>
+                {formatearMonto(totalIngresos)}
+              </Text>
+            </View>
+            <View style={[styles.resumenCard, styles.egresosCard]}>
+              <Text style={styles.resumenLabel}>Gastos</Text>
+              <Text style={[styles.resumenValue, styles.egresosValue]}>
+                {formatearMonto(totalEgresos)}
+              </Text>
+            </View>
+          </View>
+
+          <View style={[styles.saldoCard, saldo < 0 && styles.saldoNegativo]}>
+            <Text style={styles.saldoLabel}>Saldo del período</Text>
+            <Text style={[styles.saldoValue, saldo < 0 && styles.saldoValueNegativo]}>
+              {formatearMonto(saldo)}
+            </Text>
           </View>
 
           {totalesPorTipo.length > 0 ? (
@@ -156,16 +177,41 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 10,
   },
-  totalCard: {
-    backgroundColor: 'rgba(16, 185, 129, 0.12)',
+  resumenRow: { flexDirection: 'row', gap: 10 },
+  resumenCard: {
+    flex: 1,
     borderRadius: 14,
     borderWidth: 1,
+    padding: 12,
+    gap: 4,
+  },
+  ingresosCard: {
+    backgroundColor: 'rgba(16, 185, 129, 0.1)',
     borderColor: PremiumPalette.accent,
+  },
+  egresosCard: {
+    backgroundColor: 'rgba(239, 68, 68, 0.08)',
+    borderColor: PremiumPalette.danger,
+  },
+  resumenLabel: { color: PremiumPalette.textMutedOnDark, fontSize: 11, fontWeight: '600' },
+  resumenValue: { fontSize: 18, fontWeight: '900' },
+  ingresosValue: { color: PremiumPalette.accent },
+  egresosValue: { color: PremiumPalette.danger },
+  saldoCard: {
+    backgroundColor: 'rgba(79, 70, 229, 0.1)',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: PremiumPalette.primary,
     padding: 14,
     gap: 4,
   },
-  totalLabel: { color: PremiumPalette.textMutedOnDark, fontSize: 12, fontWeight: '600' },
-  totalValue: { color: PremiumPalette.accent, fontSize: 24, fontWeight: '900' },
+  saldoNegativo: {
+    backgroundColor: 'rgba(239, 68, 68, 0.08)',
+    borderColor: PremiumPalette.danger,
+  },
+  saldoLabel: { color: PremiumPalette.textMutedOnDark, fontSize: 12, fontWeight: '600' },
+  saldoValue: { color: PremiumPalette.primary, fontSize: 24, fontWeight: '900' },
+  saldoValueNegativo: { color: PremiumPalette.danger },
   desgloseRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 8 },
   desgloseLabel: { color: PremiumPalette.textMutedOnDark, fontSize: 13, flex: 1 },
   desgloseValue: { color: PremiumPalette.textOnDark, fontSize: 13, fontWeight: '700' },

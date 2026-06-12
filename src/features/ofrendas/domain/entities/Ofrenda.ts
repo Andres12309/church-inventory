@@ -1,7 +1,10 @@
+import type { FinanzaNaturalezaValue } from './FinanzaNaturaleza';
+
 export type Ofrenda = {
   readonly id: string;
   readonly organizacionId: string;
   readonly tipoActividadId: string;
+  readonly naturaleza: FinanzaNaturalezaValue;
   readonly monto: number;
   readonly fecha: string;
   readonly descripcion: string | null;

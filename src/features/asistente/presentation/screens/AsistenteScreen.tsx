@@ -14,17 +14,15 @@ import { useAgentAssistant } from '../hooks/useAgentAssistant';
 export function AsistenteScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { messages, submitQuery, context } = useAgentAssistant();
+  const { messages, submitQuery, selectOption, composer, isProcessing, context } =
+    useAgentAssistant();
   const [composerHeight, setComposerHeight] = useState(0);
 
   const chatBottomOffset = composerHeight + insets.bottom;
 
-  const handleComposerLayout = useCallback(
-    (height: number) => {
-      setComposerHeight(height);
-    },
-    [],
-  );
+  const handleComposerLayout = useCallback((height: number) => {
+    setComposerHeight(height);
+  }, []);
 
   return (
     <View style={styles.container}>
@@ -32,8 +30,8 @@ export function AsistenteScreen() {
         <View style={styles.headerWrap}>
           <SocialHeader
             title="Asistente Fieles"
-            subtitle="Pregunta por texto o voz · te guío con acciones directas"
-            badge="Guía inteligente"
+            subtitle="Chat guiado · elige opciones y responde paso a paso"
+            badge="Modo conversación"
             onBack={() => router.back()}
           />
         </View>
@@ -41,14 +39,16 @@ export function AsistenteScreen() {
         <View style={styles.chatHost}>
           <AgentMessageList
             messages={messages}
-            onSuggestionPress={submitQuery}
+            onOptionPress={(option) => selectOption(option.id, option.label)}
+            isProcessing={isProcessing}
             bottomOffset={chatBottomOffset}
           />
         </View>
 
         <AgentComposer
           onSubmit={submitQuery}
-          disabled={!context}
+          disabled={!context || !composer.enabled || isProcessing}
+          placeholder={composer.placeholder}
           bottomInset={insets.bottom}
           onLayoutHeight={handleComposerLayout}
         />

@@ -64,12 +64,21 @@ export function resolverOrganizacionPorDefecto(
   usuario: Usuario,
   rol: Rol,
   orgIdParam?: string | null,
+  orgIdsGestionables?: readonly string[],
 ): string | null {
   if (rol.codigo === UserRoleCodigo.ENCARGADO_CAPILLA) {
     return usuario.organizacionId;
   }
 
-  return orgIdParam ?? null;
+  if (orgIdParam) {
+    return orgIdParam;
+  }
+
+  if (orgIdsGestionables?.length === 1) {
+    return orgIdsGestionables[0];
+  }
+
+  return null;
 }
 
 export function obtenerFechaHoyIso(): string {

@@ -2,20 +2,23 @@ import type { Href } from "expo-router";
 
 import type { ModuloCodigoValue } from "@/shared/infrastructure/database/schema";
 
-export type AgentAction = {
+export type AgentFlowOption = {
   id: string;
   label: string;
-  icon: string;
-  href: Href;
-  module?: ModuloCodigoValue;
+  icon?: string;
+};
+
+export type AgentComposerState = {
+  enabled: boolean;
+  placeholder: string;
+  expect: "text" | "option";
 };
 
 export type AgentMessage = {
   id: string;
   role: "user" | "assistant";
   text: string;
-  actions?: AgentAction[];
-  suggestions?: string[];
+  options?: AgentFlowOption[];
 };
 
 export type AgentContext = {
@@ -28,6 +31,39 @@ export type AgentContext = {
 
 export type AgentReply = {
   text: string;
-  actions: AgentAction[];
-  suggestions: string[];
+  options?: AgentFlowOption[];
+};
+
+export type FlowId =
+  | "idle"
+  | "capilla"
+  | "ingreso"
+  | "gasto"
+  | "bien"
+  | "navegar"
+  | "usuario"
+  | "exportar";
+
+export type ConversationState = {
+  flow: FlowId;
+  step: string;
+  data: Record<string, unknown>;
+};
+
+export const IDLE_STATE: ConversationState = {
+  flow: "idle",
+  step: "menu",
+  data: {},
+};
+
+export type ConversationInput =
+  | { kind: "text"; text: string }
+  | { kind: "option"; optionId: string; label: string };
+
+export type ConversationTurnResult = {
+  userLabel?: string;
+  replies: AgentReply[];
+  state: ConversationState;
+  composer: AgentComposerState;
+  navigateTo?: Href;
 };

@@ -33,7 +33,7 @@ Catedral (diocesis) ──► N parroquias ──► N capillas
 
 **Políticas de alcance:** `src/shared/config/hierarchyAccess.ts` (`creaOrganizacionNiveles`, `resolverAlcanceJerarquico`, etc.).
 
-**Seed idempotente:** `src/features/auth/infrastructure/ensureHierarchySeed.ts`.
+**Seed idempotente:** `ensureHierarchySeed.ts` y `ensureTiposActividadSeed.ts`, invocados desde **`ensureAppSeeds.ts`** (único punto de serialización SQLite en login).
 
 **Sincronización OTA (`hierarchy.ts` → SQLite):**
 
@@ -55,18 +55,33 @@ Solo afecta IDs con prefijo `seed-org-` y `seed-user-`. Usuarios creados en la a
 | Quitar entrada del array | Desactiva (`activo = 0`) |
 | `activo: false` en la entrada | Desactiva sin quitar del array |
 
-Fuente: **`src/shared/config/tiposActividad.ts`**. Seed idempotente: `ensureTiposActividadSeed.ts` (invocado desde `ensureAppSeeds` en login). Solo afecta IDs `seed-tipo-*`; tipos creados en la app, por P2P o Excel (UUID) no se tocan.
+Fuente: **`src/shared/config/tiposActividad.ts`**. Seed idempotente vía `ensureAppSeeds` en login (incluye `ensureTiposActividadSeed.ts`). Solo afecta IDs `seed-tipo-*`; tipos creados en la app, por P2P o Excel (UUID) no se tocan.
+
+### SQLite — concurrencia y bloqueos
+
+| Pieza | Ubicación | Notas |
+|-------|-----------|-------|
+| Cola global | `shared/infrastructure/database/sqliteRetry.ts` → `runSerializedSqlite` | Serializa escrituras/seeds/consolidación/asistente; **reentrante** (llamadas anidadas no deadlock) |
+| Reintentos | `withSqliteLockRetry` | Reintenta si `database is locked` (hasta 5 veces) |
+| Seeds login | `ensureAppSeeds.ts` | Encola jerarquía + tipos actividad en una sola operación |
+| Consolidación | `ConsolidationService.ts` | Usa la misma cola global |
+| Asistente | `useAgentAssistant.ts` | Cada turno conversacional pasa por `runSerializedSqlite` + `isProcessingRef` anti doble tap |
+
+Evitar encolar `runSerializedSqlite` dentro de otra operación ya encolada sin reentrancia. Dashboard y Ajustes leen BD vía la cola + reintentos al cargar totales/perfil.
 
 ### Módulo Finanzas (ofrendas)
 
 | Pieza | Ubicación | Notas |
 |-------|-----------|-------|
-| Dashboard compacto | `OfrendasDashboardScreen.tsx` | Header + total; toolbar **Período** / **Tipos**; lista `FlashList` con `flex:1` |
-| Filtros y resumen | `FinanzasFiltrosSheet.tsx` | Fechas, org, desglose por tipo (modal) |
-| Tipos de actividad | `TiposActividadSheet.tsx` | Crear tipos en app; catálogo compartido P2P + Excel |
-| Formulario ingreso | `FormularioOfrendaScreen.tsx` | Enlace **Gestionar tipos** si no hay catálogo o para crear otro |
-| Caso de uso | `GestionarTipoActividad.ts` | `crear`, `resolverPorNombre`, `upsertDesdeIntercambio` |
-| Config OTA | `tiposActividad.ts` | Catálogo base desplegable sin recompilar nativo |
+| Dashboard compacto | `OfrendasDashboardScreen.tsx` | Ingresos / gastos / saldo; filtros **Todos · Ingresos · Gastos**; botones **+ Ingreso** y **− Gasto**; lista `FlashList` con `flex:1` |
+| Accesos rápidos Inicio | `DashboardFinanzasQuickActions.tsx` | Tarjetas **Registrar ingreso** / **Registrar gasto** en tab Inicio (`Pressable` + `router.push`, sin `Link asChild`) |
+| Alcance org | `OfrendaAccessPolicy.ts` → `resolverOrganizacionPorDefecto` | Encargado: su capilla; si el rol solo gestiona **una** org en el selector, se preselecciona al abrir Finanzas |
+| Filtros y resumen | `FinanzasFiltrosSheet.tsx` | Fechas, org, ingresos / gastos / saldo, desglose por tipo (modal) |
+| Tipos de actividad | `TiposActividadSheet.tsx` | Pestañas **Ingresos** / **Gastos**; crear tipos en app; catálogo compartido P2P + Excel |
+| Formularios | `FormularioOfrendaScreen.tsx` | Alta/edición de ingreso o gasto según `naturaleza`; enlace **Gestionar tipos** |
+| Naturaleza | `FinanzaNaturaleza.ts`, migración `004` | Columna `naturaleza` en `ofrendas` y `tipos_actividad` (`ingreso` \| `egreso`) |
+| Caso de uso | `GestionarTipoActividad.ts` | `crear({ nombre, naturaleza })`, `resolverPorNombre`, `upsertDesdeIntercambio` |
+| Config OTA | `tiposActividad.ts` | Catálogo base (ingresos y gastos eclesiásticos) desplegable sin recompilar nativo |
 
 **Sincronización del catálogo:**
 - **P2P:** tabla `tipos_actividad` en `SYNCABLE_TABLES` (catálogo global, sin scope org).
@@ -96,7 +111,8 @@ Kit centralizado en **`src/shared/presentation/ui/socialUi.tsx`** + **`premiumPa
 
 | Pieza | Ubicación | Notas |
 |-------|-----------|-------|
-| Login PIN | `PinPad.tsx` | Teclado **3×4** (1–9, fila `C` · `0` · `⌫`), botones circulares centrados |
+| Login PIN | `PinPad.tsx` | Teclado **3×4** (1–9, fila `C` · `0` · `⌫`), botones circulares centrados; auto-envío al completar PIN |
+| Anti bucle login | `LoginScreen.tsx` | `loginAttemptRef` evita reintentos infinitos si usuario/PIN inválidos; limpia PIN en error |
 | Usernames recordados | `RememberedUsernamesStorage.ts` + `LoginUsernameField.tsx` | Hasta 8 usernames en SecureStore; modal con eliminar individual |
 | Scroll login | `SocialScreen scroll="auto"` | Sin scroll si cabe en pantalla; scroll solo si el contenido excede altura |
 | Icono / splash | `appBranding.ts` + `AppLogo.tsx` | Misma imagen `assets/images/icon.png`; splash nativo `#208AEF` |
@@ -109,19 +125,49 @@ Kit centralizado en **`src/shared/presentation/ui/socialUi.tsx`** + **`premiumPa
 
 **Flujo login manual:** splash → login (usuario + PIN) → tabs **sin** pantalla de bienvenida (`welcomePending: false`).
 
+**Logout:** `authStore.logout` → `clearFeatureStores()` → `isAuthenticated: false` → borra sesión SecureStore. Evita consultas SQLite concurrentes al salir (ver § SQLite — concurrencia).
+
 **Admin seed actual:** `AndDev` / PIN `1868` en `hierarchy.ts` (no hardcodear en UI).
 
-### Asistente Fieles (guía conversacional offline)
+### Asistente Fieles (chatbot conversacional offline)
 
-Feature **`src/features/asistente/`** — motor rule-based en español (`AgentIntentEngine.ts`), sin LLM. Responde según rol/permisos con chips navegables.
+Feature **`src/features/asistente/`** — flujos guiados estilo **WhatsApp Flows**: menú y respuestas **dentro del chat** (sin panel superior de acciones), botones apilados bajo cada burbuja, preguntas paso a paso y **persistencia real en SQLite** (sin LLM).
+
+| Pieza | Ubicación | Notas |
+|-------|-----------|-------|
+| Motor de flujos | `AgentConversationEngine.ts` | Máquina de estados: `flow` + `step` + `data` |
+| Deps inyectadas | `AgentConversationDeps.ts` | Capilla, finanzas, bienes, usuarios, reportes Excel |
+| Keywords | `AgentActionCatalog.ts` | Texto/voz libre → `matchCatalogAction` inicia flujo equivalente |
+| Reexport | `AgentIntentEngine.ts` | Exporta `buildWelcomeTurn` + `handleConversationTurn` |
+| Tipos | `AgentTypes.ts` | `ConversationState`, `AgentComposerState`, `ConversationTurnResult` |
+| UI chat | `AgentMessageList.tsx` | Burbujas usuario (derecha) + asistente; botones Flows; deshabilitados mientras procesa |
+| Composer | `AgentComposer.tsx` | Texto solo cuando `composer.enabled`; placeholder dinámico |
+| Hook | `useAgentAssistant.ts` | `conversationStateRef`, `runSerializedSqlite` por turno, `isProcessingRef` |
+| Pantalla | `AsistenteScreen.tsx` | Header + lista + composer sticky (`keyboard-controller`) |
+
+**Flujos conversacionales (guardado real):**
+
+| Flujo | Pasos | Use case / acción |
+|-------|--------|-------------------|
+| **Nueva capilla** | nombre → sector → ciudad (opc.) → confirmar | `CrearCapilla.execute` |
+| **Ingreso** | monto → tipo → fecha → nota (opc.) → confirmar | `RegistrarRecaudacion.guardar` (`ingreso`) |
+| **Gasto** | idem ingreso | `RegistrarRecaudacion.guardar` (`egreso`) |
+| **Bien** | nombre → categoría → estado → confirmar | `GestionarBien.guardar` |
+| **Nuevo usuario** | rol → org → username → nombre → PIN → confirmar PIN → confirmar | `CrearUsuarioLocal.execute` |
+| **Exportar Excel** | tipo → período (todo / rango) → confirmar → generar → compartir | `GenerarReporteXlsx` + `CompartirReporte` |
+| **Navegar** | confirmar → `router.push` | inventario, finanzas, organizaciones, reportes, sync, ajustes |
+
+**Menú inicial** (según módulos del rol): ingreso, gasto, bien, capilla, nuevo usuario, exportar Excel, ver pantallas, sync, ajustes.
+
+**Composer dinámico:** se **desactiva** cuando el paso espera botón (`expect: 'option'`); se **activa** para texto (nombre, monto, fechas `AAAA-MM-DD`, PIN 4 dígitos). Tras error de guardado ofrece **Reintentar**.
+
+**Texto libre / voz:** frases como «registrar gasto», «nueva capilla», «exportar excel», «crear usuario» → catálogo de keywords inicia el flujo correspondiente.
 
 | Ruta | Pantalla |
 |------|----------|
-| `/(protected)/asistente` | Chat texto + voz (si nativo disponible) |
+| `/(protected)/asistente` | Chat conversacional + voz |
 
-**Acceso:** FAB 🤖 en tabs distintos de Inicio; en **Inicio** el FAB ⚡ se despliega hacia arriba (Asistente + Acciones rápidas, auto-colapsa ~5 s o tap fuera). Modal de acciones rápidas con `ScrollView`. Overlay global: `TabFabOverlay` en `(tabs)/_layout.tsx`.
-
-**Teclado (chat):** `react-native-keyboard-controller` con `KeyboardProvider` en `app/_layout.tsx`. Pantalla asistente: `KeyboardChatScrollView` (mensajes) + `KeyboardStickyView` (composer). Ver [Expo keyboard handling](https://docs.expo.dev/guides/keyboard-handling/).
+**Acceso:** FAB 🤖 en tabs; en Inicio el FAB ⚡ incluye enlace al asistente.
 
 ---
 
@@ -158,7 +204,7 @@ src/
       domain/ application/ infrastructure/ presentation/
   shared/
     infrastructure/
-      database/        # SQLiteProvider, migraciones, schema.ts (único punto BD)
+      database/        # SQLiteProvider, migraciones, schema.ts, sqliteRetry.ts (cola + reintentos)
       di/              # Contenedor de dependencias
     presentation/
       ui/              # Design system: socialUi, premiumPalette, AppLogo, DraggableFab
@@ -349,6 +395,7 @@ reportes_generados (historial exportaciones)
 | id | TEXT PK | `seed-tipo-*` (OTA) o UUID (app/P2P/Excel) |
 | codigo | TEXT UNIQUE | Slug estable, ej. `misas_dominicales` |
 | nombre | TEXT | Etiqueta visible en UI y reportes |
+| naturaleza | TEXT | `ingreso` (default) \| `egreso` — migración `004` |
 | activo | INTEGER | 0 = oculto en selectores |
 | sync_vector | TEXT | JSON Lamport |
 | updated_at | TEXT | |
@@ -363,6 +410,7 @@ Migración `003_tipos_actividad_sync` añade columnas sync en dispositivos exist
 | id | TEXT PK | |
 | organizacion_id | TEXT FK | Nodo hoja |
 | tipo_actividad_id | TEXT FK | |
+| naturaleza | TEXT | `ingreso` (default) \| `egreso` — migración `004` |
 | monto | REAL | Moneda local |
 | fecha | TEXT | DATE ISO |
 | descripcion | TEXT NULL | |
@@ -380,7 +428,7 @@ Migración `003_tipos_actividad_sync` añade columnas sync en dispositivos exist
 | organizacion_id | TEXT PK FK | |
 | total_bienes | INTEGER | Suma cantidad bienes subárbol |
 | total_bienes_por_estado | TEXT | JSON `{ "excelente": N, ... }` |
-| total_ofrendas | REAL | Suma montos subárbol |
+| total_ofrendas | REAL | Saldo neto subárbol (ingresos − gastos) |
 | total_ofrendas_por_tipo | TEXT | JSON |
 | calculado_at | TEXT | |
 
@@ -753,4 +801,5 @@ Ya configurado en el proyecto. Referencia:
 12. [ ] PayloadSerializer excluye binarios de fotos (§4.6)
 13. [ ] Export XLSX + sharing
 14. [ ] Background tasks: consolidación, purga 60d, cleanup reportes 30d
-15. [ ] Asistente Fieles + keyboard-controller en chat
+15. [ ] Asistente Fieles: flujos conversacionales (capilla, finanzas, bien, usuario, Excel) + keyboard-controller
+16. [ ] `runSerializedSqlite` / `withSqliteLockRetry` en operaciones críticas SQLite

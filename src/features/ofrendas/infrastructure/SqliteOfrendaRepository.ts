@@ -16,6 +16,7 @@ const ofrendaSelect = `
   o.${OfrendasColumns.ID} AS id,
   o.${OfrendasColumns.ORGANIZACION_ID} AS organizacion_id,
   o.${OfrendasColumns.TIPO_ACTIVIDAD_ID} AS tipo_actividad_id,
+  o.${OfrendasColumns.NATURALEZA} AS naturaleza,
   o.${OfrendasColumns.MONTO} AS monto,
   o.${OfrendasColumns.FECHA} AS fecha,
   o.${OfrendasColumns.DESCRIPCION} AS descripcion,
@@ -52,6 +53,11 @@ export class SqliteOfrendaRepository implements IOfrendaRepository {
       params.push(filtros.tipoActividadId);
     }
 
+    if (filtros?.naturaleza) {
+      conditions.push(`o.${OfrendasColumns.NATURALEZA} = ?`);
+      params.push(filtros.naturaleza);
+    }
+
     if (filtros?.fechaInicio) {
       conditions.push(`o.${OfrendasColumns.FECHA} >= ?`);
       params.push(filtros.fechaInicio);
@@ -80,6 +86,7 @@ export class SqliteOfrendaRepository implements IOfrendaRepository {
         ${TiposActividadColumns.ID} AS id,
         ${TiposActividadColumns.CODIGO} AS codigo,
         ${TiposActividadColumns.NOMBRE} AS nombre,
+        ${TiposActividadColumns.NATURALEZA} AS naturaleza,
         ${TiposActividadColumns.ACTIVO} AS activo,
         ${TiposActividadColumns.SYNC_VECTOR} AS sync_vector,
         ${TiposActividadColumns.UPDATED_AT} AS updated_at,
@@ -98,6 +105,7 @@ export class SqliteOfrendaRepository implements IOfrendaRepository {
         ${TiposActividadColumns.ID} AS id,
         ${TiposActividadColumns.CODIGO} AS codigo,
         ${TiposActividadColumns.NOMBRE} AS nombre,
+        ${TiposActividadColumns.NATURALEZA} AS naturaleza,
         ${TiposActividadColumns.ACTIVO} AS activo,
         ${TiposActividadColumns.SYNC_VECTOR} AS sync_vector,
         ${TiposActividadColumns.UPDATED_AT} AS updated_at,
@@ -116,6 +124,7 @@ export class SqliteOfrendaRepository implements IOfrendaRepository {
         ${TiposActividadColumns.ID} AS id,
         ${TiposActividadColumns.CODIGO} AS codigo,
         ${TiposActividadColumns.NOMBRE} AS nombre,
+        ${TiposActividadColumns.NATURALEZA} AS naturaleza,
         ${TiposActividadColumns.ACTIVO} AS activo,
         ${TiposActividadColumns.SYNC_VECTOR} AS sync_vector,
         ${TiposActividadColumns.UPDATED_AT} AS updated_at,
@@ -134,14 +143,16 @@ export class SqliteOfrendaRepository implements IOfrendaRepository {
         ${TiposActividadColumns.ID},
         ${TiposActividadColumns.CODIGO},
         ${TiposActividadColumns.NOMBRE},
+        ${TiposActividadColumns.NATURALEZA},
         ${TiposActividadColumns.ACTIVO},
         ${TiposActividadColumns.SYNC_VECTOR},
         ${TiposActividadColumns.UPDATED_AT},
         ${TiposActividadColumns.UPDATED_BY_DEVICE}
-      ) VALUES (?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(${TiposActividadColumns.ID}) DO UPDATE SET
         ${TiposActividadColumns.CODIGO} = excluded.${TiposActividadColumns.CODIGO},
         ${TiposActividadColumns.NOMBRE} = excluded.${TiposActividadColumns.NOMBRE},
+        ${TiposActividadColumns.NATURALEZA} = excluded.${TiposActividadColumns.NATURALEZA},
         ${TiposActividadColumns.ACTIVO} = excluded.${TiposActividadColumns.ACTIVO},
         ${TiposActividadColumns.SYNC_VECTOR} = excluded.${TiposActividadColumns.SYNC_VECTOR},
         ${TiposActividadColumns.UPDATED_AT} = excluded.${TiposActividadColumns.UPDATED_AT},
@@ -150,6 +161,7 @@ export class SqliteOfrendaRepository implements IOfrendaRepository {
         tipo.id,
         tipo.codigo,
         tipo.nombre,
+        tipo.naturaleza,
         tipo.activo ? 1 : 0,
         tipo.syncVector,
         tipo.updatedAt,
@@ -166,16 +178,18 @@ export class SqliteOfrendaRepository implements IOfrendaRepository {
         ${OfrendasColumns.ID},
         ${OfrendasColumns.ORGANIZACION_ID},
         ${OfrendasColumns.TIPO_ACTIVIDAD_ID},
+        ${OfrendasColumns.NATURALEZA},
         ${OfrendasColumns.MONTO},
         ${OfrendasColumns.FECHA},
         ${OfrendasColumns.DESCRIPCION},
         ${OfrendasColumns.SYNC_VECTOR},
         ${OfrendasColumns.UPDATED_AT},
         ${OfrendasColumns.UPDATED_BY_DEVICE}
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(${OfrendasColumns.ID}) DO UPDATE SET
         ${OfrendasColumns.ORGANIZACION_ID} = excluded.${OfrendasColumns.ORGANIZACION_ID},
         ${OfrendasColumns.TIPO_ACTIVIDAD_ID} = excluded.${OfrendasColumns.TIPO_ACTIVIDAD_ID},
+        ${OfrendasColumns.NATURALEZA} = excluded.${OfrendasColumns.NATURALEZA},
         ${OfrendasColumns.MONTO} = excluded.${OfrendasColumns.MONTO},
         ${OfrendasColumns.FECHA} = excluded.${OfrendasColumns.FECHA},
         ${OfrendasColumns.DESCRIPCION} = excluded.${OfrendasColumns.DESCRIPCION},
@@ -185,6 +199,7 @@ export class SqliteOfrendaRepository implements IOfrendaRepository {
         ofrenda.id,
         ofrenda.organizacionId,
         ofrenda.tipoActividadId,
+        ofrenda.naturaleza,
         monto,
         ofrenda.fecha,
         ofrenda.descripcion,

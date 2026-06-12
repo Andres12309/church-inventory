@@ -1,8 +1,11 @@
 import type { Ofrenda } from '../entities/Ofrenda';
 import type { TipoActividad } from '../entities/TipoActividad';
 
+import type { FinanzaNaturalezaValue } from '../entities/FinanzaNaturaleza';
+
 export type OfrendaFiltros = {
   tipoActividadId?: string;
+  naturaleza?: FinanzaNaturalezaValue;
   fechaInicio?: string;
   fechaFin?: string;
 };

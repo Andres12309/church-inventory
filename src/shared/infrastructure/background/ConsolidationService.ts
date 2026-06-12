@@ -17,28 +17,20 @@ import {
   serializarJsonRecord,
   type AggregateRow,
 } from '@/features/configuracion/infrastructure/InventarioAggregateMapper';
-import { withSqliteLockRetry } from '@/shared/infrastructure/database/sqliteRetry';
+import { runSerializedSqlite, withSqliteLockRetry } from '@/shared/infrastructure/database/sqliteRetry';
 
 type BienesEstadoRow = { estado: string; total: number };
-type OfrendasTipoRow = { tipo_actividad_id: string; total: number };
+type OfrendasTipoRow = { tipo_actividad_id: string; naturaleza: string; total: number };
 
 export class ConsolidationService implements IConsolidationService {
-  private consolidationQueue: Promise<void> = Promise.resolve();
-
   constructor(private readonly db: SQLiteDatabase) {}
 
   async consolidarNodo(orgId: string): Promise<void> {
-    await this.enqueueConsolidation(() => this.consolidarNodoInternal(orgId));
+    await runSerializedSqlite(() => this.consolidarNodoInternal(orgId));
   }
 
   async consolidarTodoElArbol(): Promise<void> {
-    await this.enqueueConsolidation(() => this.consolidarTodoElArbolInternal());
-  }
-
-  private enqueueConsolidation(fn: () => Promise<void>): Promise<void> {
-    const run = this.consolidationQueue.then(fn);
-    this.consolidationQueue = run.catch(() => undefined);
-    return run;
+    await runSerializedSqlite(() => this.consolidarTodoElArbolInternal());
   }
 
   private async consolidarNodoInternal(orgId: string): Promise<void> {
@@ -150,11 +142,12 @@ export class ConsolidationService implements IConsolidationService {
   }> {
     const rows = await this.db.getAllAsync<OfrendasTipoRow>(
       `SELECT o.${OfrendasColumns.TIPO_ACTIVIDAD_ID} AS tipo_actividad_id,
+              o.${OfrendasColumns.NATURALEZA} AS naturaleza,
               SUM(o.${OfrendasColumns.MONTO}) AS total
        FROM ${Tables.OFRENDAS} o
        WHERE o.${OfrendasColumns.ORGANIZACION_ID} = ?
          AND o.${OfrendasColumns.DELETED_AT} IS NULL
-       GROUP BY o.${OfrendasColumns.TIPO_ACTIVIDAD_ID}`,
+       GROUP BY o.${OfrendasColumns.TIPO_ACTIVIDAD_ID}, o.${OfrendasColumns.NATURALEZA}`,
       [orgId],
     );
 
@@ -163,8 +156,9 @@ export class ConsolidationService implements IConsolidationService {
 
     for (const row of rows) {
       const monto = Math.round(row.total * 100) / 100;
-      porTipo[row.tipo_actividad_id] = monto;
-      total = Math.round((total + monto) * 100) / 100;
+      const signed = row.naturaleza === 'egreso' ? -monto : monto;
+      porTipo[row.tipo_actividad_id] = (porTipo[row.tipo_actividad_id] ?? 0) + signed;
+      total = Math.round((total + signed) * 100) / 100;
     }
 
     return { total, porTipo };

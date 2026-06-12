@@ -9,6 +9,7 @@ import { SocialVoiceInput } from '@/shared/presentation/ui/SocialVoiceInput';
 type AgentComposerProps = {
   onSubmit: (text: string) => void;
   disabled?: boolean;
+  placeholder?: string;
   bottomInset?: number;
   onLayoutHeight?: (height: number) => void;
 };
@@ -16,6 +17,7 @@ type AgentComposerProps = {
 export function AgentComposer({
   onSubmit,
   disabled = false,
+  placeholder = 'Escribe aquí…',
   bottomInset = 0,
   onLayoutHeight,
 }: AgentComposerProps) {
@@ -59,9 +61,11 @@ export function AgentComposer({
         onLayout={handleLayout}
       >
         <Text style={styles.hint}>
-          {speechAvailable
-            ? 'Escribe o dicta tu pregunta · 🎙️ envía al soltar'
-            : 'Escribe tu pregunta y pulsa ➤ para enviar'}
+          {disabled
+            ? 'Selecciona una opción en el chat ↑'
+            : speechAvailable
+              ? 'Escribe o dicta tu respuesta · 🎙️'
+              : 'Escribe tu respuesta y pulsa ➤'}
         </Text>
 
         <View style={styles.row}>
@@ -71,7 +75,7 @@ export function AgentComposer({
               value={draft}
               onChangeText={setDraft}
               onFinalTranscript={handleFinalTranscript}
-              placeholder="Ej: ¿Dónde registro una ofrenda?"
+              placeholder={placeholder}
               placeholderTextColor={PremiumPalette.textMutedOnDark}
               editable={!disabled}
               onSubmitEditing={handleSend}

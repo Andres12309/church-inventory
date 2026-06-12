@@ -1,5 +1,5 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { useAuthStore } from '@/features/auth/presentation/store/authStore';
@@ -19,14 +19,25 @@ import {
 import { SocialVoiceInput } from '@/shared/presentation/ui/SocialVoiceInput';
 
 import { obtenerFechaHoyIso } from '../../application/services/OfrendaAccessPolicy';
+import {
+  FinanzaNaturaleza,
+  esFinanzaNaturaleza,
+  etiquetaNaturaleza,
+  type FinanzaNaturalezaValue,
+} from '../../domain/entities/FinanzaNaturaleza';
 import { TiposActividadSheet } from '../components/TiposActividadSheet';
 import { useOfrendasUseCases } from '../hooks/useOfrendasUseCases';
 import { useOfrendasStore } from '../store/ofrendasStore';
 
 export function FormularioOfrendaScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ id?: string; orgId?: string }>();
+  const params = useLocalSearchParams<{ id?: string; orgId?: string; naturaleza?: string }>();
   const isEditing = Boolean(params.id);
+
+  const naturalezaParam: FinanzaNaturalezaValue =
+    params.naturaleza && esFinanzaNaturaleza(params.naturaleza)
+      ? params.naturaleza
+      : FinanzaNaturaleza.INGRESO;
 
   const usuario = useAuthStore((s) => s.usuarioActual);
   const rol = useAuthStore((s) => s.rolActual);
@@ -50,6 +61,13 @@ export function FormularioOfrendaScreen() {
   const [isLoading, setIsLoading] = useState(isEditing);
   const [tiposVisible, setTiposVisible] = useState(false);
 
+  const naturalezaForm = formulario?.naturaleza ?? naturalezaParam;
+  const esGasto = naturalezaForm === FinanzaNaturaleza.EGRESO;
+  const tiposFiltrados = useMemo(
+    () => tiposActividad.filter((t) => t.naturaleza === naturalezaForm),
+    [tiposActividad, naturalezaForm],
+  );
+
   useEffect(() => {
     if (!permissionService) {
       return;
@@ -68,7 +86,7 @@ export function FormularioOfrendaScreen() {
     }
 
     if (!isEditing) {
-      iniciarFormulario(orgId);
+      iniciarFormulario(orgId, naturalezaParam);
       setIsLoading(false);
       return;
     }
@@ -84,12 +102,12 @@ export function FormularioOfrendaScreen() {
           permissionService!,
         );
         if (mounted) {
-          iniciarFormulario(orgId!, ofrenda);
+          iniciarFormulario(orgId!, ofrenda.naturaleza, ofrenda);
         }
       } catch (error) {
         if (mounted) {
           const message =
-            error instanceof Error ? error.message : 'No se pudo cargar la recaudación';
+            error instanceof Error ? error.message : 'No se pudo cargar el movimiento';
           Alert.alert('Error', message, [{ text: 'Volver', onPress: () => router.back() }]);
         }
       } finally {
@@ -108,6 +126,7 @@ export function FormularioOfrendaScreen() {
     consultarFinanzas,
     iniciarFormulario,
     isEditing,
+    naturalezaParam,
     params.id,
     params.orgId,
     permissionService,
@@ -141,7 +160,8 @@ export function FormularioOfrendaScreen() {
       return;
     }
 
-    Alert.alert('Eliminar recaudación', '¿Deseas eliminar este ingreso del historial?', [
+    const tipoMov = esGasto ? 'gasto' : 'ingreso';
+    Alert.alert(`Eliminar ${tipoMov}`, `¿Deseas eliminar este ${tipoMov} del historial?`, [
       { text: 'Cancelar', style: 'cancel' },
       {
         text: 'Eliminar',
@@ -166,16 +186,21 @@ export function FormularioOfrendaScreen() {
     clearError();
   };
 
-  const handleCrearTipo = async (nombre: string) => {
+  const handleCrearTipo = async (nombre: string, naturaleza: typeof naturalezaForm) => {
     if (!permissionService) {
       return;
     }
-    const tipo = await crearTipoActividad(nombre, permissionService, gestionarTipoActividad);
+    const tipo = await crearTipoActividad(nombre, naturaleza, permissionService, gestionarTipoActividad);
     updateField('tipoActividadId', tipo.id);
     setTiposVisible(false);
   };
 
-  const sinTipos = tiposActividad.length === 0;
+  const sinTipos = tiposFiltrados.length === 0;
+  const tituloNuevo = esGasto ? 'Nuevo gasto' : 'Nuevo ingreso';
+  const tituloEditar = esGasto ? 'Editar gasto' : 'Editar ingreso';
+  const subtitulo = esGasto
+    ? 'Registra egresos: mantenimiento, servicios, material litúrgico…'
+    : 'Registra ingresos: ofrendas, colectas, donaciones…';
 
   if (!tieneAcceso) {
     return (
@@ -196,9 +221,9 @@ export function FormularioOfrendaScreen() {
   return (
     <SocialFormScreen>
       <SocialHeader
-        title={isEditing ? 'Editar ingreso' : 'Nuevo ingreso'}
-        subtitle="Registra ofrendas y recaudaciones de la capilla"
-        badge={isEditing ? 'Edición' : 'Alta'}
+        title={isEditing ? tituloEditar : tituloNuevo}
+        subtitle={subtitulo}
+        badge={isEditing ? 'Edición' : etiquetaNaturaleza(naturalezaForm)}
       />
 
       <SocialCard>
@@ -208,7 +233,7 @@ export function FormularioOfrendaScreen() {
             onChangeText={(text) => updateField('monto', text.replace(/[^0-9.,]/g, ''))}
             placeholder="0.00"
             keyboardType="decimal-pad"
-            style={styles.montoInput}
+            style={[styles.montoInput, esGasto && styles.montoGasto]}
           />
         </SocialFormField>
 
@@ -217,8 +242,8 @@ export function FormularioOfrendaScreen() {
             <View style={styles.sinTipos}>
               <SocialEmpty
                 icon="🏷️"
-                title="Sin tipos de actividad"
-                message="Crea al menos un tipo para clasificar este ingreso."
+                title={`Sin tipos de ${esGasto ? 'gasto' : 'ingreso'}`}
+                message={`Crea al menos un tipo para clasificar este ${esGasto ? 'gasto' : 'ingreso'}.`}
               />
               <SocialPrimaryButton
                 label="Gestionar tipos"
@@ -228,7 +253,7 @@ export function FormularioOfrendaScreen() {
           ) : (
             <>
               <PillFilterRow
-                options={tiposActividad.map((tipo) => ({ id: tipo.id, label: tipo.nombre }))}
+                options={tiposFiltrados.map((tipo) => ({ id: tipo.id, label: tipo.nombre }))}
                 selectedId={formulario.tipoActividadId || null}
                 onSelect={(id) => id && updateField('tipoActividadId', id)}
               />
@@ -260,7 +285,11 @@ export function FormularioOfrendaScreen() {
             multiline
             value={formulario.descripcion}
             onChangeText={(text) => updateField('descripcion', text)}
-            placeholder='Ej. "Colecta misa de confirmación 10:00 AM"'
+            placeholder={
+              esGasto
+                ? 'Ej. "Reparación techo capilla lateral"'
+                : 'Ej. "Colecta misa de confirmación 10:00 AM"'
+            }
           />
         </SocialFormField>
       </SocialCard>
@@ -268,10 +297,10 @@ export function FormularioOfrendaScreen() {
       {errorMessage ? <Text style={styles.error}>{errorMessage}</Text> : null}
 
       <SocialPrimaryButton
-        label="Guardar recaudación"
+        label={esGasto ? 'Guardar gasto' : 'Guardar ingreso'}
         loading={isSaving}
         onPress={() => void handleGuardar()}
-        variant="accent"
+        variant={esGasto ? 'danger' : 'accent'}
       />
 
       {isEditing ? (
@@ -287,6 +316,7 @@ export function FormularioOfrendaScreen() {
         onClose={() => setTiposVisible(false)}
         tipos={tiposActividad}
         isSaving={isSaving}
+        naturalezaInicial={naturalezaForm}
         onCrear={handleCrearTipo}
       />
     </SocialFormScreen>
@@ -301,6 +331,7 @@ const styles = StyleSheet.create({
     backgroundColor: PremiumPalette.canvas,
   },
   montoInput: { fontSize: 28, fontWeight: '800', color: PremiumPalette.accent },
+  montoGasto: { color: PremiumPalette.danger },
   fechaRow: { flexDirection: 'row', gap: 10, alignItems: 'center' },
   fechaInput: { flex: 1 },
   hoyBtn: {

@@ -35,6 +35,7 @@ export type OfrendaExportRow = {
   readonly orgCodigo: string;
   readonly orgNombre: string;
   readonly tipoActividad: string;
+  readonly naturaleza: string;
   readonly monto: number;
   readonly fecha: string;
   readonly descripcion: string | null;
@@ -45,6 +46,7 @@ export type TipoActividadExportRow = {
   readonly id: string;
   readonly codigo: string;
   readonly nombre: string;
+  readonly naturaleza: string;
   readonly activo: boolean;
   readonly updatedAt: string;
 };

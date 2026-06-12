@@ -7,6 +7,7 @@ import type { IConsolidationTrigger } from '@/features/configuracion/application
 import type { Bien } from '@/features/bienes/domain/entities/Bien';
 import type { IBienRepository } from '@/features/bienes/domain/repositories/IBienRepository';
 import type { Ofrenda } from '@/features/ofrendas/domain/entities/Ofrenda';
+import { FinanzaNaturaleza, esFinanzaNaturaleza } from '@/features/ofrendas/domain/entities/FinanzaNaturaleza';
 import type { IOfrendaRepository } from '@/features/ofrendas/domain/repositories/IOfrendaRepository';
 import { GestionarTipoActividad } from '@/features/ofrendas/application/use-cases/GestionarTipoActividad';
 import { redondearMonto } from '@/features/ofrendas/infrastructure/OfrendaMapper';
@@ -656,6 +657,10 @@ export class ImportarReporteXlsx {
           id: row.id,
           codigo: row.codigo ?? undefined,
           nombre: row.nombre,
+          naturaleza:
+            row.naturaleza && esFinanzaNaturaleza(row.naturaleza)
+              ? row.naturaleza
+              : FinanzaNaturaleza.INGRESO,
           activo: row.activo,
           updatedAt: row.updatedAt,
         },
@@ -682,9 +687,15 @@ export class ImportarReporteXlsx {
       }
 
       let tipoActividadId = item.tipoActividadId;
+      const naturalezaMovimiento =
+        item.row.naturaleza && esFinanzaNaturaleza(item.row.naturaleza)
+          ? item.row.naturaleza
+          : FinanzaNaturaleza.INGRESO;
+
       if (!tipoActividadId && item.row.tipoActividadNombre) {
         const tipo = await this.gestionarTipoActividad.resolverPorNombre(
           item.row.tipoActividadNombre,
+          naturalezaMovimiento,
           permissionService,
         );
         tipoActividadId = tipo.id;
@@ -699,6 +710,7 @@ export class ImportarReporteXlsx {
         id: item.row.id,
         organizacionId: item.organizacionId,
         tipoActividadId: tipoActividadId,
+        naturaleza: naturalezaMovimiento,
         monto: redondearMonto(item.row.monto),
         fecha: item.row.fecha,
         descripcion: item.row.descripcion,

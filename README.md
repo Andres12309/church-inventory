@@ -26,7 +26,7 @@ Aplicación móvil para gestionar **bienes patrimoniales**, **ofrendas**, **jera
 | 🔐 **PIN local** | Usuario + PIN de 4 dígitos; sesión en SecureStore |
 | 🤝 **Sync P2P** | mDNS + TCP en LAN; sin servidor central |
 | 📊 **Excel** | Exportar e importar reportes `.xlsx` |
-| 🤖 **Asistente** | Guía conversacional offline (texto + voz en dev build) |
+| 🤖 **Asistente** | Chat conversacional offline (flujos WhatsApp, texto + voz en dev build) |
 | 🔄 **OTA** | Jerarquía (`hierarchy.ts`) y tipos de ofrenda (`tiposActividad.ts`) vía EAS Update |
 
 ---
@@ -35,7 +35,8 @@ Aplicación móvil para gestionar **bienes patrimoniales**, **ofrendas**, **jera
 
 ### 🔑 Autenticación
 
-- Teclado **PIN circular 3×4** (`C` · `0` · borrar)
+- Teclado **PIN circular 3×4** (`C` · `0` · borrar); envío automático al completar 4 dígitos
+- Si usuario o PIN son incorrectos, muestra error y **no reintenta en bucle** (puedes corregir y volver a intentar)
 - **Recordarme** + lista de usernames guardados (eliminar individual)
 - Login **sin scroll** si cabe en pantalla (`scroll="auto"`)
 - Icono oficial de la app en login y splash animado (`#208AEF`)
@@ -55,7 +56,7 @@ Al reabrir la app con sesión activa:
 
 | Tab | Icono | Contenido |
 |-----|-------|-----------|
-| **Inicio** | 🏠 | Dashboard, métricas y acciones rápidas |
+| **Inicio** | 🏠 | Dashboard, métricas, **finanzas rápidas** (+ ingreso / − gasto) y acciones |
 | **Inventario** | 📦 | CRUD de bienes por capilla |
 | **Finanzas** | 💰 | Ofrendas por tipo de actividad |
 | **Reportes** | 📈 | Export / import Excel |
@@ -112,20 +113,24 @@ Alcance: `hierarchyAccess.ts` (`full` · `subtree` · `single`)
 
 ---
 
-## 💰 Finanzas (ofrendas)
+## 💰 Finanzas (ingresos y gastos)
 
-Dashboard compacto pensado para pantallas pequeñas: la lista de movimientos ocupa el espacio principal; filtros y resumen van en modales.
+Dashboard compacto para capillas e iglesias: la lista de movimientos ocupa el espacio principal; filtros y resumen van en modales.
 
 | Función | Detalle |
 |---------|---------|
-| 📋 **Lista** | `FlashList` a pantalla completa con filtro por tipo (pills) |
-| 🏷️ **Tipos de actividad** | Crear desde la app (modal **Tipos**) o en el formulario de ingreso |
+| 📋 **Lista** | `FlashList` con filtro **Todos / Ingresos / Gastos** y por tipo de actividad |
+| ➕ **Registrar** | **+ Ingreso** (ofrendas, colectas…) y **− Gasto** (mantenimiento, servicios…) |
+| 📊 **Resumen** | Tarjetas de ingresos, gastos y saldo del período |
+| ⚡ **Inicio rápido** | En dashboard: **Registrar ingreso** y **Registrar gasto** sin entrar al tab Finanzas |
+| 🏛️ **Organización** | Encargado: su capilla fija; otros roles: si solo gestionan **una** org, se preselecciona al entrar al tab |
+| 🏷️ **Tipos de actividad** | Pestañas **Ingresos** / **Gastos** en modal **Tipos** o desde el formulario |
 | 📅 **Período** | Modal **Filtros y resumen** — fechas, org y desglose por tipo |
 | 🔄 **Sync P2P** | Catálogo `tipos_actividad` sincronizable entre dispositivos |
-| 📊 **Excel** | Hoja «Tipos actividad» en export/import; auto-crea tipos al importar |
+| 📊 **Excel** | Hoja «Tipos actividad» con columna naturaleza; auto-crea tipos al importar |
 | 🔄 **OTA** | Catálogo base en `src/shared/config/tiposActividad.ts` (ids `seed-tipo-*`) |
 
-Tipos base incluidos: misas, matrimonios, eventos, colectas, bingos/kermeses (editables vía OTA). Monto, fecha y descripción por capilla; consolidación hacia parroquia y diócesis.
+Tipos base: misas, matrimonios, colectas (ingresos); mantenimiento, material litúrgico, caridad (gastos). Monto, fecha y descripción por capilla; consolidación neta hacia parroquia y diócesis.
 
 ---
 
@@ -156,11 +161,30 @@ Tipos base incluidos: misas, matrimonios, eventos, colectas, bingos/kermeses (ed
 
 ## 🤖 Asistente Fieles
 
-Motor **rule-based** en español (sin LLM) en `src/features/asistente/`:
+Motor **rule-based** en español (sin LLM) en `src/features/asistente/`. Interacción **100 % por chat**, estilo WhatsApp Flows: el menú y las opciones aparecen como botones bajo cada mensaje del asistente.
 
-- 💬 Chat con chips navegables según rol
-- 🎤 Dictado por voz (dev build + `expo-speech-recognition`)
+### Qué puedes hacer desde el chat
+
+| Acción | Cómo |
+|--------|------|
+| 💰 Registrar ingreso / 📤 gasto | Menú o «registrar ingreso», «registrar gasto» |
+| 📦 Registrar bien | Menú o «nuevo bien» |
+| ⛪ Nueva capilla | Menú o «nueva capilla» (requiere parroquia asignada) |
+| 👤 Nuevo usuario | Menú o «crear usuario» (rol, org, username, PIN) |
+| 📊 Exportar Excel | Menú o «exportar», «excel», «reporte» → tipo, período, compartir archivo |
+| 📋 Ver pantallas | Inventario, finanzas, organizaciones, reportes, sync, ajustes |
+
+Cada flujo te guía paso a paso (monto, tipo, fecha, confirmación…) y **guarda en SQLite** con los mismos casos de uso que los formularios.
+
+### UX del chat
+
+- 💬 Burbujas usuario (derecha) y asistente (izquierda) con texto en **negrita** markdown
+- 🔘 Botones de respuesta apilados; se desactivan mientras procesa un turno
+- ⌨️ Campo de texto solo cuando el paso lo pide (nombre, monto, fechas, PIN)
+- 🎤 Dictado por voz vía `SocialVoiceInput` (dev build + `expo-speech-recognition`)
 - ⌨️ Teclado sticky con `react-native-keyboard-controller`
+
+**Ruta:** `/(protected)/asistente` · FAB 🤖 en tabs · enlace desde acciones rápidas del Inicio
 
 ---
 
@@ -212,7 +236,7 @@ import 'react-native-get-random-values';
 |------|------------|
 | 🚀 Framework | Expo SDK 56 · React Native 0.85 · Expo Router |
 | 🗃️ Estado | Zustand |
-| 💾 BD | expo-sqlite (WAL, migraciones) |
+| 💾 BD | expo-sqlite (WAL, migraciones, cola `runSerializedSqlite`) |
 | 🔐 Auth | PIN SHA-256 · SecureStore |
 | 📜 Listas | @shopify/flash-list |
 | 📗 Excel | xlsx (SheetJS) |
@@ -243,7 +267,7 @@ src/
   shared/
     config/            # hierarchy.ts · hierarchyAccess.ts · tiposActividad.ts
     constants/         # appBranding.ts
-    infrastructure/    # SQLite · background tasks
+    infrastructure/    # SQLite · sqliteRetry · background tasks
     presentation/ui/   # Design system
 ```
 

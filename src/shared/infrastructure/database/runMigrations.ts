@@ -12,12 +12,17 @@ import {
   MIGRATION_003_SQL,
   MIGRATION_003_VERSION,
 } from './migrations/003_tipos_actividad_sync';
+import {
+  MIGRATION_004_SQL,
+  MIGRATION_004_VERSION,
+} from './migrations/004_finanzas_naturaleza';
 import { SchemaMigrationsColumns, Tables } from './schema';
 
 const MIGRATIONS = [
   { version: MIGRATION_001_VERSION, sql: MIGRATION_001_SQL },
   { version: MIGRATION_002_VERSION, sql: MIGRATION_002_SQL },
   { version: MIGRATION_003_VERSION, sql: MIGRATION_003_SQL },
+  { version: MIGRATION_004_VERSION, sql: MIGRATION_004_SQL },
 ] as const;
 
 export class DatabaseMigrationError extends Error {

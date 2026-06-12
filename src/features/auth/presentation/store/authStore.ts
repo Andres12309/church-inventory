@@ -136,17 +136,19 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
   },
 
   logout: async () => {
-    await clearSessionUsuarioId();
+    clearFeatureStores();
     set({
       usuarioActual: null,
       rolActual: null,
       modulosPermitidos: [],
       permissionService: null,
       isAuthenticated: false,
+      isHydrating: false,
       isLoading: false,
       errorMessage: null,
       welcomePending: false,
     });
+    await clearSessionUsuarioId();
   },
 
   clearError: () => set({ errorMessage: null }),

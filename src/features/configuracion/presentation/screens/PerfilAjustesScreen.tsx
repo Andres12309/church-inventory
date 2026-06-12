@@ -20,6 +20,11 @@ import { useDashboardStore } from '@/features/dashboard/presentation/store/dashb
 import { SYNC_ROUTES } from '@/features/sync/presentation/routes';
 import { createConsolidationService } from '@/shared/infrastructure/background/createConsolidationTrigger';
 import { ModuloCodigo } from '@/shared/infrastructure/database/schema';
+import {
+  buscarActualizacionOta,
+  descargarYRecargarOta,
+  formatearEtiquetaOta,
+} from '@/shared/infrastructure/updates/otaUpdateService';
 import { AppActivityIndicator } from '@/shared/presentation/ui/AppActivityIndicator';
 import { PremiumPalette } from '@/shared/presentation/ui/premiumPalette';
 import { SocialHeader } from '@/shared/presentation/ui/socialUi';
@@ -105,13 +110,57 @@ export function PerfilAjustesScreen() {
 
   const handleBuscarActualizaciones = useCallback(async () => {
     setIsCheckingUpdates(true);
-    await new Promise((resolve) => setTimeout(resolve, 900));
-    setIsCheckingUpdates(false);
-    Alert.alert(
-      'Actualizaciones',
-      `Estás en la última versión estable (v${appVersion}-Local). No se requiere internet.`,
-    );
-  }, [appVersion]);
+    try {
+      const result = await buscarActualizacionOta();
+
+      switch (result.status) {
+        case 'unavailable':
+          Alert.alert('Actualizaciones OTA', result.reason);
+          break;
+        case 'error':
+          Alert.alert(
+            'No se pudo verificar',
+            `${result.message}\n\nComprueba tu conexión a internet e inténtalo de nuevo.`,
+          );
+          break;
+        case 'upToDate':
+          Alert.alert(
+            'Sin actualizaciones',
+            `Ya tienes la última versión OTA publicada para este runtime.\n\n${formatearEtiquetaOta(result.runtime)}`,
+          );
+          break;
+        case 'available':
+          Alert.alert(
+            'Actualización disponible',
+            'Hay una nueva versión en EAS Update. Se descargará el bundle JS y la app se reiniciará. Requiere internet.',
+            [
+              { text: 'Más tarde', style: 'cancel' },
+              {
+                text: 'Descargar e instalar',
+                onPress: () => {
+                  void (async () => {
+                    setIsCheckingUpdates(true);
+                    try {
+                      await descargarYRecargarOta();
+                    } catch (error) {
+                      const message =
+                        error instanceof Error
+                          ? error.message
+                          : 'No se pudo descargar la actualización';
+                      Alert.alert('Error al actualizar', message);
+                      setIsCheckingUpdates(false);
+                    }
+                  })();
+                },
+              },
+            ],
+          );
+          break;
+      }
+    } finally {
+      setIsCheckingUpdates(false);
+    }
+  }, []);
 
   const handleSync = useCallback(() => {
     if (!tieneAcceso(ModuloCodigo.SYNC)) {
@@ -214,8 +263,12 @@ export function PerfilAjustesScreen() {
           <View style={styles.settingsCard}>
             <SettingsRow
               icon="🚀"
-              title="Buscar Actualizaciones"
-              subtitle={`Versión instalada: v${appVersion}-Local`}
+              title="Buscar actualizaciones OTA"
+              subtitle={
+                snapshot
+                  ? snapshot.otaEtiqueta
+                  : `Versión instalada: v${appVersion}`
+              }
               onPress={() => void handleBuscarActualizaciones()}
               loading={isCheckingUpdates}
             />

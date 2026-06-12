@@ -1,15 +1,15 @@
 import { useEffect, useRef } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { KeyboardChatScrollView } from 'react-native-keyboard-controller';
-import { useRouter } from 'expo-router';
 
 import { PremiumPalette } from '@/shared/presentation/ui/premiumPalette';
 
-import type { AgentMessage } from '../../domain/entities/AgentTypes';
+import type { AgentFlowOption, AgentMessage } from '../../domain/entities/AgentTypes';
 
 type AgentMessageListProps = {
   messages: AgentMessage[];
-  onSuggestionPress: (text: string) => void;
+  onOptionPress: (option: AgentFlowOption) => void;
+  isProcessing?: boolean;
   bottomOffset?: number;
 };
 
@@ -27,8 +27,12 @@ function renderBoldSegments(text: string) {
   });
 }
 
-export function AgentMessageList({ messages, onSuggestionPress, bottomOffset = 0 }: AgentMessageListProps) {
-  const router = useRouter();
+export function AgentMessageList({
+  messages,
+  onOptionPress,
+  isProcessing = false,
+  bottomOffset = 0,
+}: AgentMessageListProps) {
   const scrollRef = useRef<React.ElementRef<typeof KeyboardChatScrollView>>(null);
 
   useEffect(() => {
@@ -41,7 +45,7 @@ export function AgentMessageList({ messages, onSuggestionPress, bottomOffset = 0
     }, 80);
 
     return () => clearTimeout(timer);
-  }, [messages]);
+  }, [messages, isProcessing]);
 
   return (
     <KeyboardChatScrollView
@@ -65,43 +69,43 @@ export function AgentMessageList({ messages, onSuggestionPress, bottomOffset = 0
 
           <View
             style={[
-              styles.bubble,
-              message.role === 'user' ? styles.bubbleUser : styles.bubbleAssistant,
+              styles.messageColumn,
+              message.role === 'user' ? styles.messageColumnUser : styles.messageColumnAssistant,
             ]}
           >
-            <Text
+            <View
               style={[
-                styles.bubbleText,
-                message.role === 'user' ? styles.bubbleTextUser : styles.bubbleTextAssistant,
+                styles.bubble,
+                message.role === 'user' ? styles.bubbleUser : styles.bubbleAssistant,
               ]}
             >
-              {renderBoldSegments(message.text)}
-            </Text>
+              <Text
+                style={[
+                  styles.bubbleText,
+                  message.role === 'user' ? styles.bubbleTextUser : styles.bubbleTextAssistant,
+                ]}
+              >
+                {renderBoldSegments(message.text)}
+              </Text>
+            </View>
 
-            {message.actions && message.actions.length > 0 ? (
-              <View style={styles.actions}>
-                {message.actions.map((action) => (
+            {message.role === 'assistant' && message.options && message.options.length > 0 ? (
+              <View style={styles.optionsList}>
+                {message.options.map((option) => (
                   <Pressable
-                    key={action.id}
-                    onPress={() => router.push(action.href)}
-                    style={({ pressed }) => [styles.actionChip, pressed && styles.pressed]}
+                    key={option.id}
+                    onPress={() => onOptionPress(option)}
+                    disabled={isProcessing}
+                    style={({ pressed }) => [
+                      styles.optionButton,
+                      isProcessing && styles.optionDisabled,
+                      pressed && !isProcessing && styles.pressed,
+                    ]}
                   >
-                    <Text style={styles.actionIcon}>{action.icon}</Text>
-                    <Text style={styles.actionLabel}>{action.label}</Text>
-                  </Pressable>
-                ))}
-              </View>
-            ) : null}
-
-            {message.suggestions && message.suggestions.length > 0 ? (
-              <View style={styles.suggestions}>
-                {message.suggestions.map((suggestion) => (
-                  <Pressable
-                    key={suggestion}
-                    onPress={() => onSuggestionPress(suggestion)}
-                    style={({ pressed }) => [styles.suggestionChip, pressed && styles.pressed]}
-                  >
-                    <Text style={styles.suggestionText}>{suggestion}</Text>
+                    {option.icon ? (
+                      <Text style={styles.optionIcon}>{option.icon}</Text>
+                    ) : null}
+                    <Text style={styles.optionLabel}>{option.label}</Text>
                   </Pressable>
                 ))}
               </View>
@@ -109,6 +113,16 @@ export function AgentMessageList({ messages, onSuggestionPress, bottomOffset = 0
           </View>
         </View>
       ))}
+
+      {isProcessing ? (
+        <View style={styles.typingRow}>
+          <Text style={styles.avatar}>🤖</Text>
+          <View style={styles.typingBubble}>
+            <ActivityIndicator size="small" color={PremiumPalette.primary} />
+            <Text style={styles.typingText}>Un momento…</Text>
+          </View>
+        </View>
+      ) : null}
     </KeyboardChatScrollView>
   );
 }
@@ -118,15 +132,15 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   list: {
-    paddingHorizontal: 16,
+    paddingHorizontal: 12,
     paddingTop: 8,
     paddingBottom: 16,
-    gap: 12,
+    gap: 14,
   },
   bubbleWrap: {
     flexDirection: 'row',
-    alignItems: 'flex-end',
-    gap: 8,
+    alignItems: 'flex-start',
+    gap: 6,
   },
   bubbleWrapUser: {
     justifyContent: 'flex-end',
@@ -134,26 +148,38 @@ const styles = StyleSheet.create({
   bubbleWrapAssistant: {
     justifyContent: 'flex-start',
   },
+  messageColumn: {
+    maxWidth: '86%',
+    gap: 6,
+  },
+  messageColumnUser: {
+    alignSelf: 'flex-end',
+    alignItems: 'flex-end',
+  },
+  messageColumnAssistant: {
+    alignSelf: 'flex-start',
+    alignItems: 'stretch',
+  },
   avatar: {
     fontSize: 22,
-    marginBottom: 4,
+    marginTop: 4,
   },
   bubble: {
-    maxWidth: '88%',
     borderRadius: 16,
     paddingHorizontal: 14,
-    paddingVertical: 12,
-    gap: 10,
+    paddingVertical: 10,
   },
   bubbleUser: {
     backgroundColor: PremiumPalette.primary,
     borderBottomRightRadius: 4,
+    alignSelf: 'flex-end',
   },
   bubbleAssistant: {
     backgroundColor: PremiumPalette.surface,
     borderWidth: 1,
     borderColor: PremiumPalette.surfaceMuted,
     borderBottomLeftRadius: 4,
+    alignSelf: 'flex-start',
   },
   bubbleText: {
     fontSize: 15,
@@ -168,42 +194,55 @@ const styles = StyleSheet.create({
   bold: {
     fontWeight: '800',
   },
-  actions: {
-    gap: 8,
+  optionsList: {
+    gap: 6,
+    alignSelf: 'stretch',
   },
-  actionChip: {
+  optionButton: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    backgroundColor: 'rgba(79, 70, 229, 0.12)',
+    backgroundColor: PremiumPalette.surface,
     borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
     borderWidth: 1,
-    borderColor: 'rgba(79, 70, 229, 0.25)',
+    borderColor: 'rgba(37, 211, 102, 0.45)',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
   },
-  actionIcon: { fontSize: 16 },
-  actionLabel: {
+  optionIcon: {
+    fontSize: 16,
+  },
+  optionLabel: {
     color: PremiumPalette.primary,
     fontSize: 14,
     fontWeight: '700',
     flex: 1,
   },
-  suggestions: {
+  optionDisabled: {
+    opacity: 0.45,
+  },
+  typingRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
+    alignItems: 'center',
     gap: 6,
   },
-  suggestionChip: {
-    borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    backgroundColor: PremiumPalette.surfaceMuted,
+  typingBubble: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: PremiumPalette.surface,
+    borderRadius: 16,
+    borderBottomLeftRadius: 4,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: PremiumPalette.surfaceMuted,
   },
-  suggestionText: {
-    color: PremiumPalette.textSoftOnDark,
-    fontSize: 12,
-    fontWeight: '600',
+  typingText: {
+    color: PremiumPalette.textMutedOnDark,
+    fontSize: 13,
   },
-  pressed: { opacity: 0.85 },
+  pressed: {
+    opacity: 0.88,
+  },
 });

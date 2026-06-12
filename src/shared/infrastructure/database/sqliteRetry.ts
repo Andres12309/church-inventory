@@ -33,3 +33,32 @@ export async function withSqliteLockRetry<T>(
 
   throw lastError;
 }
+
+let sqliteQueue: Promise<unknown> = Promise.resolve();
+let insideSerializedSqlite = false;
+
+/**
+ * Encola operaciones SQLite para evitar transacciones concurrentes.
+ * Reentrante: llamadas anidadas (p. ej. seeds dentro de hydrate) ejecutan inline.
+ */
+export function runSerializedSqlite<T>(fn: () => Promise<T>): Promise<T> {
+  if (insideSerializedSqlite) {
+    return withSqliteLockRetry(fn);
+  }
+
+  const run = sqliteQueue.then(async () => {
+    insideSerializedSqlite = true;
+    try {
+      return await withSqliteLockRetry(fn);
+    } finally {
+      insideSerializedSqlite = false;
+    }
+  });
+
+  sqliteQueue = run.then(
+    () => undefined,
+    () => undefined,
+  );
+
+  return run;
+}

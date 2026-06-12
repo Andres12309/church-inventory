@@ -59,6 +59,7 @@ type OfrendaRow = {
   org_codigo: string;
   org_nombre: string;
   tipo_actividad: string;
+  naturaleza: string;
   monto: number;
   fecha: string;
   descripcion: string | null;
@@ -127,6 +128,7 @@ export class SqliteReporteDataRepository implements IReporteDataRepository {
         id: string;
         codigo: string;
         nombre: string;
+        naturaleza: string;
         activo: number;
         updated_at: string;
       }>(
@@ -134,6 +136,7 @@ export class SqliteReporteDataRepository implements IReporteDataRepository {
           ${TiposActividadColumns.ID} AS id,
           ${TiposActividadColumns.CODIGO} AS codigo,
           ${TiposActividadColumns.NOMBRE} AS nombre,
+          ${TiposActividadColumns.NATURALEZA} AS naturaleza,
           ${TiposActividadColumns.ACTIVO} AS activo,
           ${TiposActividadColumns.UPDATED_AT} AS updated_at
          FROM ${Tables.TIPOS_ACTIVIDAD}
@@ -148,6 +151,7 @@ export class SqliteReporteDataRepository implements IReporteDataRepository {
       id: row.id,
       codigo: row.codigo,
       nombre: row.nombre,
+      naturaleza: row.naturaleza,
       activo: row.activo === 1,
       updatedAt: row.updated_at,
     }));
@@ -271,6 +275,7 @@ export class SqliteReporteDataRepository implements IReporteDataRepository {
         o.${OfrendasColumns.ID} AS id,
         o.${OfrendasColumns.ORGANIZACION_ID} AS organizacion_id,
         o.${OfrendasColumns.TIPO_ACTIVIDAD_ID} AS tipo_actividad_id,
+        o.${OfrendasColumns.NATURALEZA} AS naturaleza,
         org.${OrganizacionesColumns.CODIGO_INTERNO} AS org_codigo,
         org.${OrganizacionesColumns.NOMBRE} AS org_nombre,
         t.${TiposActividadColumns.NOMBRE} AS tipo_actividad,
@@ -297,6 +302,7 @@ export class SqliteReporteDataRepository implements IReporteDataRepository {
       orgCodigo: row.org_codigo,
       orgNombre: row.org_nombre,
       tipoActividad: row.tipo_actividad,
+      naturaleza: row.naturaleza,
       monto: row.monto,
       fecha: row.fecha,
       descripcion: row.descripcion,

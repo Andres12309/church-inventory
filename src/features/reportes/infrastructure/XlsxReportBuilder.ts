@@ -197,6 +197,7 @@ function construirHojaOfrendas(data: ReporteExportData): Record<string, unknown>
     'Código org.': row.orgCodigo,
     Organización: row.orgNombre,
     'Tipo actividad': row.tipoActividad,
+    Naturaleza: row.naturaleza,
     'Monto (USD)': formatearMoneda(row.monto),
     Descripción: row.descripcion ?? '',
     'Última actualización': formatearFecha(row.updatedAt),
@@ -211,6 +212,7 @@ function construirHojaTiposActividad(data: ReporteExportData): Record<string, un
   return data.catalogoTiposActividad.map((row) => ({
     Nombre: row.nombre,
     Código: row.codigo,
+    Naturaleza: row.naturaleza,
     Activo: row.activo ? 'Sí' : 'No',
     ID: row.id,
     id_tipo_actividad: row.id,

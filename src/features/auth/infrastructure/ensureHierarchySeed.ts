@@ -37,9 +37,6 @@ const MODULO_ID_BY_CODIGO: Record<string, string> = {
 
 const MANAGED_ROLE_IDS = Object.values(SeedIds.ROLES);
 
-/** Serializa llamadas concurrentes (login + hydrate + dashboard). */
-let seedQueue: Promise<void> = Promise.resolve();
-
 function buildNotInClause(ids: string[]): { sql: string; params: string[] } {
   if (ids.length === 0) {
     return { sql: '1 = 1', params: [] };
@@ -48,7 +45,7 @@ function buildNotInClause(ids: string[]): { sql: string; params: string[] } {
   return { sql: `id NOT IN (${placeholders})`, params: ids };
 }
 
-async function syncHierarchySeed(db: SQLiteDatabase): Promise<void> {
+export async function ensureHierarchySeed(db: SQLiteDatabase): Promise<void> {
   const now = new Date().toISOString();
   const configOrgIds = HIERARCHY_V1.organizaciones.map((o) => o.id);
   const configUserIds = HIERARCHY_V1.usuarios.map((u) => u.id);
@@ -165,15 +162,4 @@ async function syncHierarchySeed(db: SQLiteDatabase): Promise<void> {
       }
     }
   });
-}
-
-/**
- * Sincroniza `hierarchy.ts` → SQLite (idempotente + UPSERT).
- * Solo gestiona IDs con prefijo seed-org- / seed-user-.
- * Usuarios creados en la app (UUID) no se tocan.
- */
-export async function ensureHierarchySeed(db: SQLiteDatabase): Promise<void> {
-  const run = seedQueue.then(() => syncHierarchySeed(db));
-  seedQueue = run.catch(() => undefined);
-  await run;
 }

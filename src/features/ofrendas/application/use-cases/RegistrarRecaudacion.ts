@@ -14,6 +14,8 @@ import {
 } from '@/shared/infrastructure/sync/SyncContext';
 import type { SQLiteDatabase } from 'expo-sqlite';
 
+import type { FinanzaNaturalezaValue } from '../../domain/entities/FinanzaNaturaleza';
+import { FinanzaNaturaleza } from '../../domain/entities/FinanzaNaturaleza';
 import type { Ofrenda } from '../../domain/entities/Ofrenda';
 import { OfrendaError } from '../../domain/errors/OfrendaError';
 import { OfrendaNotFoundError } from '../../domain/errors/OfrendaNotFoundError';
@@ -55,6 +57,16 @@ export class RegistrarRecaudacion {
       this.organizacionRepository,
     );
 
+    const tipo = await this.ofrendaRepository.obtenerTipoActividadPorId(input.tipoActividadId);
+    if (!tipo) {
+      throw new OfrendaError('Tipo de actividad no encontrado');
+    }
+    if (tipo.naturaleza !== input.naturaleza) {
+      throw new OfrendaError(
+        `El tipo «${tipo.nombre}» no corresponde a un ${input.naturaleza === FinanzaNaturaleza.EGRESO ? 'gasto' : 'ingreso'}`,
+      );
+    }
+
     const deviceId = await getOrCreateDeviceId(this.db);
     const now = new Date().toISOString();
     const id = input.id ?? uuidv4();
@@ -72,6 +84,7 @@ export class RegistrarRecaudacion {
       id,
       organizacionId: input.organizacionId,
       tipoActividadId: input.tipoActividadId,
+      naturaleza: input.naturaleza,
       monto: redondearMonto(input.monto),
       fecha: input.fecha,
       descripcion: input.descripcion?.trim() ?? null,

@@ -7,6 +7,8 @@ import { registrarTipoActividadSync } from '@/shared/infrastructure/sync/SyncCha
 import { getOrCreateDeviceId } from '@/shared/infrastructure/sync/SyncContext';
 import type { SQLiteDatabase } from 'expo-sqlite';
 
+import type { FinanzaNaturalezaValue } from '../../domain/entities/FinanzaNaturaleza';
+import { FinanzaNaturaleza } from '../../domain/entities/FinanzaNaturaleza';
 import type { TipoActividad } from '../../domain/entities/TipoActividad';
 import { OfrendaError } from '../../domain/errors/OfrendaError';
 import type { IOfrendaRepository } from '../../domain/repositories/IOfrendaRepository';
@@ -18,12 +20,14 @@ import { tieneAccesoOfrendas } from '../services/OfrendaAccessPolicy';
 
 export type CrearTipoActividadInput = {
   nombre: string;
+  naturaleza: FinanzaNaturalezaValue;
 };
 
 export type UpsertTipoActividadInput = {
   id: string;
   codigo?: string;
   nombre: string;
+  naturaleza?: FinanzaNaturalezaValue;
   activo?: boolean;
   updatedAt?: string;
   updatedByDevice?: string;
@@ -60,7 +64,9 @@ export class GestionarTipoActividad {
 
     const existentes = await this.ofrendaRepository.listarTiposActividad();
     const nombreDuplicado = existentes.some(
-      (tipo) => tipo.nombre.trim().toLowerCase() === nombre.toLowerCase(),
+      (tipo) =>
+        tipo.naturaleza === input.naturaleza &&
+        tipo.nombre.trim().toLowerCase() === nombre.toLowerCase(),
     );
     if (nombreDuplicado) {
       throw new OfrendaError('Ya existe un tipo de actividad con ese nombre');
@@ -75,6 +81,7 @@ export class GestionarTipoActividad {
       id: uuidv4(),
       codigo,
       nombre,
+      naturaleza: input.naturaleza,
       activo: true,
       syncVector: '{}',
       updatedAt: now,
@@ -89,6 +96,7 @@ export class GestionarTipoActividad {
 
   async resolverPorNombre(
     nombre: string,
+    naturaleza: FinanzaNaturalezaValue,
     permissionService: PermissionService,
   ): Promise<TipoActividad> {
     const normalized = nombre.trim();
@@ -98,13 +106,15 @@ export class GestionarTipoActividad {
 
     const existentes = await this.ofrendaRepository.listarTiposActividad();
     const match = existentes.find(
-      (tipo) => tipo.nombre.trim().toLowerCase() === normalized.toLowerCase(),
+      (tipo) =>
+        tipo.naturaleza === naturaleza &&
+        tipo.nombre.trim().toLowerCase() === normalized.toLowerCase(),
     );
     if (match) {
       return match;
     }
 
-    return this.crear({ nombre: normalized }, permissionService);
+    return this.crear({ nombre: normalized, naturaleza }, permissionService);
   }
 
   async upsertDesdeIntercambio(
@@ -150,6 +160,7 @@ export class GestionarTipoActividad {
       id: existente?.id ?? input.id,
       codigo,
       nombre,
+      naturaleza: input.naturaleza ?? existente?.naturaleza ?? FinanzaNaturaleza.INGRESO,
       activo: input.activo ?? true,
       syncVector: input.syncVector ?? existente?.syncVector ?? '{}',
       updatedAt: incomingUpdatedAt,

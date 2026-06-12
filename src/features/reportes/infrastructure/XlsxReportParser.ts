@@ -33,6 +33,7 @@ export type ParsedOfrendaImportRow = {
   readonly orgCodigo: string | null;
   readonly tipoActividadId: string | null;
   readonly tipoActividadNombre: string | null;
+  readonly naturaleza: string | null;
   readonly monto: number;
   readonly fecha: string;
   readonly descripcion: string | null;
@@ -43,6 +44,7 @@ export type ParsedTipoActividadImportRow = {
   readonly id: string;
   readonly codigo: string | null;
   readonly nombre: string;
+  readonly naturaleza: string | null;
   readonly activo: boolean;
   readonly updatedAt: string;
 };
@@ -173,6 +175,7 @@ function parseOfrendas(rows: Record<string, unknown>[]): ParsedOfrendaImportRow[
       orgCodigo: asString(row['Código org.']),
       tipoActividadId: asString(row.id_tipo_actividad),
       tipoActividadNombre: asString(row['Tipo actividad']),
+      naturaleza: asString(row.Naturaleza) ?? asString(row.naturaleza),
       monto,
       fecha,
       descripcion: asString(row.Descripción),
@@ -198,6 +201,7 @@ function parseTiposActividad(rows: Record<string, unknown>[]): ParsedTipoActivid
       id,
       codigo: asString(row.Código) ?? asString(row.codigo),
       nombre,
+      naturaleza: asString(row.Naturaleza) ?? asString(row.naturaleza),
       activo: activoRaw ? activoRaw.toLowerCase() !== 'no' && activoRaw !== '0' : true,
       updatedAt: parseUpdatedAt(row),
     });

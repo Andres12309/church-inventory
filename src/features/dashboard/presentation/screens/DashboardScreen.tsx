@@ -5,6 +5,7 @@ import { BottomTabInset, MaxContentWidth } from '@/constants/theme';
 import { PremiumPalette } from '@/shared/presentation/ui/premiumPalette';
 
 import { DashboardAdminLinks } from '../components/DashboardAdminLinks';
+import { DashboardFinanzasQuickActions } from '../components/DashboardFinanzasQuickActions';
 import { DashboardStatCards } from '../components/DashboardStatCards';
 import { useDashboardData } from '../hooks/useDashboardData';
 import { SocialHeader } from '@/shared/presentation/ui/socialUi';
@@ -57,6 +58,8 @@ export function DashboardScreen() {
           {errorMessage ? (
             <Text style={styles.errorText}>{errorMessage}</Text>
           ) : null}
+
+          <DashboardFinanzasQuickActions />
 
           <DashboardAdminLinks />
 
