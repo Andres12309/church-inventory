@@ -7,6 +7,7 @@ import {
   SyncOperacion,
   Tables,
   TiposActividadColumns,
+  UsuariosColumns,
 } from '@/shared/infrastructure/database/schema';
 
 import type { SyncChange } from '../domain/entities/SyncChange';
@@ -45,6 +46,11 @@ export class SyncChangeApplier {
 
     if (tabla === Tables.TIPOS_ACTIVIDAD) {
       await this.applyTipoActividad(registroId, payload, operacion);
+      return;
+    }
+
+    if (tabla === Tables.USUARIOS) {
+      await this.applyUsuario(registroId, payload, operacion);
     }
   }
 
@@ -261,6 +267,51 @@ export class SyncChangeApplier {
         bindValue(payload.sync_vector ?? '{}'),
         bindValue(payload.updated_at),
         bindValue(payload.updated_by_device ?? ''),
+      ],
+    );
+  }
+
+  private async applyUsuario(
+    id: string,
+    payload: Record<string, unknown>,
+    operacion: SyncChange['operacion'],
+  ): Promise<void> {
+    if (operacion === SyncOperacion.DELETE || payload.activo === 0) {
+      await this.db.runAsync(
+        `UPDATE ${Tables.USUARIOS}
+         SET ${UsuariosColumns.ACTIVO} = 0,
+             ${UsuariosColumns.UPDATED_AT} = ?
+         WHERE ${UsuariosColumns.ID} = ?`,
+        [bindValue(payload.updated_at ?? new Date().toISOString()), id],
+      );
+      return;
+    }
+
+    await this.db.runAsync(
+      `INSERT INTO ${Tables.USUARIOS} (
+        ${UsuariosColumns.ID}, ${UsuariosColumns.ORGANIZACION_ID}, ${UsuariosColumns.ROLE_ID},
+        ${UsuariosColumns.USERNAME}, ${UsuariosColumns.NOMBRE}, ${UsuariosColumns.EMAIL},
+        ${UsuariosColumns.PIN_HASH}, ${UsuariosColumns.ACTIVO}, ${UsuariosColumns.UPDATED_AT}
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(${UsuariosColumns.ID}) DO UPDATE SET
+        ${UsuariosColumns.ORGANIZACION_ID} = excluded.${UsuariosColumns.ORGANIZACION_ID},
+        ${UsuariosColumns.ROLE_ID} = excluded.${UsuariosColumns.ROLE_ID},
+        ${UsuariosColumns.USERNAME} = excluded.${UsuariosColumns.USERNAME},
+        ${UsuariosColumns.NOMBRE} = excluded.${UsuariosColumns.NOMBRE},
+        ${UsuariosColumns.EMAIL} = excluded.${UsuariosColumns.EMAIL},
+        ${UsuariosColumns.PIN_HASH} = excluded.${UsuariosColumns.PIN_HASH},
+        ${UsuariosColumns.ACTIVO} = excluded.${UsuariosColumns.ACTIVO},
+        ${UsuariosColumns.UPDATED_AT} = excluded.${UsuariosColumns.UPDATED_AT}`,
+      [
+        id,
+        bindValue(payload.organizacion_id),
+        bindValue(payload.role_id),
+        bindValue(payload.username ?? null),
+        bindValue(payload.nombre),
+        bindValue(payload.email ?? null),
+        bindValue(payload.pin_hash),
+        bindValue(payload.activo ?? 1),
+        bindValue(payload.updated_at),
       ],
     );
   }

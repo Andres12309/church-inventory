@@ -21,6 +21,7 @@ import { InvalidPinError } from "../../domain/errors/InvalidPinError";
 import { UserNotFoundError } from "../../domain/errors/UserNotFoundError";
 import { getRememberedUsernames, removeRememberedUsername } from "../../infrastructure/RememberedUsernamesStorage";
 import { LoginUsernameField } from "../components/LoginUsernameField";
+import { LoginBootstrapSyncSheet } from "../components/LoginBootstrapSyncSheet";
 import { PIN_PAD_LENGTH, PinPad } from "../components/PinPad";
 import { useAuthUseCases } from "../hooks/useAuthUseCases";
 import { AUTH_ROUTES } from "../routes";
@@ -41,6 +42,7 @@ export function LoginScreen() {
   const [rememberMe, setRememberMe] = useState(false);
   const [rememberedUsernames, setRememberedUsernames] = useState<string[]>([]);
   const [bootstrapping, setBootstrapping] = useState(true);
+  const [bootstrapSyncVisible, setBootstrapSyncVisible] = useState(false);
   const loginAttemptRef = useRef<string | null>(null);
 
   useEffect(() => {
@@ -208,7 +210,20 @@ export function LoginScreen() {
             <Text style={styles.errorText}>{errorMessage}</Text>
           ) : null}
           {isLoading ? <AppActivityIndicator style={styles.loader} /> : null}
+
+          <Pressable
+            onPress={() => setBootstrapSyncVisible(true)}
+            disabled={isLoading}
+            style={styles.bootstrapLink}
+          >
+            <Text style={styles.bootstrapLinkText}>¿Dispositivo nuevo? Recibir datos de otro equipo</Text>
+          </Pressable>
         </SocialCard>
+
+        <LoginBootstrapSyncSheet
+          visible={bootstrapSyncVisible}
+          onClose={() => setBootstrapSyncVisible(false)}
+        />
       </KeyboardAvoidingView>
     </SocialScreen>
   );
@@ -267,4 +282,15 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
   loader: { marginTop: 8 },
+  bootstrapLink: {
+    marginTop: 8,
+    paddingVertical: 8,
+    alignItems: 'center',
+  },
+  bootstrapLinkText: {
+    color: PremiumPalette.primary,
+    fontSize: 13,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
 });

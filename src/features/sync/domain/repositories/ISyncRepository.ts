@@ -1,5 +1,6 @@
 import type { OrgChecksumEntry } from '../protocol/SyncProtocolMessages';
 
+import type { SyncDirection, SyncPlan } from '../entities/SyncPlan';
 import type { SyncChange } from '../entities/SyncChange';
 import type { SyncMeta } from '../entities/SyncMeta';
 import type { SyncSession } from '../entities/SyncSession';
@@ -15,6 +16,13 @@ export interface ISyncRepository {
   guardarMeta(meta: SyncMeta): Promise<void>;
   obtenerUltimoLamport(): Promise<number>;
   listarDeltasDesde(lamportExclusive: number, orgScope: string[]): Promise<SyncChange[]>;
+  listarCambiosParaEnviar(
+    lamportExclusive: number,
+    orgScope: string[],
+    localDeviceId: string,
+    plan?: SyncPlan,
+    direction?: SyncDirection,
+  ): Promise<SyncChange[]>;
   calcularChecksums(orgIds: string[]): Promise<OrgChecksumEntry[]>;
   crearSesion(session: SyncSession): Promise<void>;
   finalizarSesion(
@@ -26,6 +34,7 @@ export interface ISyncRepository {
     changes: SyncChange[],
     orgScope: string[],
     localDeviceId: string,
+    plan?: SyncPlan,
   ): Promise<MergeResult>;
   registrarCambioLocal(change: SyncChange): Promise<void>;
 }

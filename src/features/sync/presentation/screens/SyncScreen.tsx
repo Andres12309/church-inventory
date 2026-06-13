@@ -19,6 +19,7 @@ import { ThemedView } from '@/components/themed-view';
 import { MaxContentWidth, Radius, Spacing } from '@/constants/theme';
 import { useAuthStore } from '@/features/auth/presentation/store/authStore';
 import { resolverOrgScopeSync } from '@/features/sync/application/OrgScopeResolver';
+import { puedeConfigurarPaqueteSync } from '@/features/sync/application/SyncPackagePolicy';
 import { getOrCreateDeviceId } from '@/shared/infrastructure/sync/SyncContext';
 import { ModuloCodigo } from '@/shared/infrastructure/database/schema';
 import { useTheme } from '@/hooks/use-theme';
@@ -30,7 +31,11 @@ import type { DiscoveredPeer } from '../../domain/entities/DiscoveredPeer';
 import { SYNC_PEER_SCAN_TIMEOUT_MS } from '../../domain/constants/SyncConstants';
 import { SyncError } from '../../domain/errors/SyncError';
 import { useSyncUseCases } from '../hooks/useSyncUseCases';
+import { SyncPackageSelector } from '../components/SyncPackageSelector';
 import { useSyncStore } from '../store/syncStore';
+import type { Organizacion } from '@/features/organizaciones/domain/entities/Organizacion';
+import type { UsuarioListadoItem } from '@/features/usuarios/domain/entities/UsuarioListadoItem';
+import { SqliteUsuarioRepository } from '@/features/usuarios/infrastructure/repositories/SqliteUsuarioRepository';
 
 function mapSyncErrorMessage(error: unknown): string {
   if (!(error instanceof Error)) {
@@ -91,6 +96,10 @@ export function SyncScreen() {
   const statusMessage = useSyncStore((s) => s.statusMessage);
   const recordsProcessed = useSyncStore((s) => s.recordsProcessed);
   const sessionPin = useSyncStore((s) => s.sessionPin);
+  const syncPlan = useSyncStore((s) => s.syncPlan);
+  const pushOnly = useSyncStore((s) => s.pushOnly);
+  const setSyncPlan = useSyncStore((s) => s.setSyncPlan);
+  const setPushOnly = useSyncStore((s) => s.setPushOnly);
   const errorMessage = useSyncStore((s) => s.errorMessage);
   const wifiConnected = useSyncStore((s) => s.wifiConnected);
   const setVisible = useSyncStore((s) => s.setVisible);
@@ -103,7 +112,11 @@ export function SyncScreen() {
   const addPeer = useSyncStore((s) => s.addPeer);
   const resetRuntime = useSyncStore((s) => s.resetRuntime);
   const [showTechnical, setShowTechnical] = useState(false);
+  const [organizaciones, setOrganizaciones] = useState<Organizacion[]>([]);
+  const [usuarios, setUsuarios] = useState<UsuarioListadoItem[]>([]);
   const scanTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const puedeConfigurarPaquete = rol ? puedeConfigurarPaqueteSync(rol) : false;
 
   const clearScanTimeout = useCallback(() => {
     if (scanTimeoutRef.current) {
@@ -143,6 +156,38 @@ export function SyncScreen() {
     };
   }, [clearScanTimeout, orchestrator, refreshNetwork, resetRuntime]);
 
+  useEffect(() => {
+    if (!usuario || !rol || !puedeConfigurarPaquete) {
+      return;
+    }
+
+    let mounted = true;
+
+    async function loadSelectorData() {
+      const orgScopeIds = await resolverOrgScopeSync(usuario!, rol!, organizacionRepository);
+      const enAlcance: Organizacion[] = [];
+      for (const orgId of orgScopeIds) {
+        const org = await organizacionRepository.obtenerPorId(orgId);
+        if (org) {
+          enAlcance.push(org);
+        }
+      }
+      const usuarioRepository = new SqliteUsuarioRepository(db);
+      const listado = await usuarioRepository.listarEnOrganizaciones(orgScopeIds);
+
+      if (mounted) {
+        setOrganizaciones(enAlcance);
+        setUsuarios(listado);
+      }
+    }
+
+    void loadSelectorData();
+
+    return () => {
+      mounted = false;
+    };
+  }, [db, organizacionRepository, puedeConfigurarPaquete, rol, usuario]);
+
   const buildContext = useCallback(async () => {
     if (!usuario || !rol) {
       throw new SyncError('Sesión no disponible');
@@ -156,8 +201,10 @@ export function SyncScreen() {
       deviceName: Device.deviceName ?? Device.modelName ?? 'Dispositivo Fieles Bienes',
       orgScope,
       sessionPin: sessionPin || undefined,
+      syncPlan: puedeConfigurarPaquete ? syncPlan : undefined,
+      direction: pushOnly ? 'push' as const : 'bidirectional' as const,
     };
-  }, [db, organizacionRepository, rol, sessionPin, usuario]);
+  }, [db, organizacionRepository, puedeConfigurarPaquete, pushOnly, rol, sessionPin, syncPlan, usuario]);
 
   const handleToggleVisible = async (value: boolean) => {
     setError(null);
@@ -296,6 +343,17 @@ export function SyncScreen() {
               Permite que otros dispositivos autorizados encuentren este equipo
             </ThemedText>
           </AppCard>
+
+          {puedeConfigurarPaquete ? (
+            <SyncPackageSelector
+              organizaciones={organizaciones}
+              usuarios={usuarios}
+              plan={syncPlan}
+              pushOnly={pushOnly}
+              onChange={setSyncPlan}
+              onPushOnlyChange={setPushOnly}
+            />
+          ) : null}
 
           <AppCard>
             <ThemedText type="smallBold">PIN de emparejamiento (opcional)</ThemedText>

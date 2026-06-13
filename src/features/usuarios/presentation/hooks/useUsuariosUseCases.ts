@@ -3,6 +3,7 @@ import { useMemo } from 'react';
 import { useSQLiteContext } from 'expo-sqlite';
 
 import { SqliteOrganizacionRepository } from '@/features/organizaciones/infrastructure/SqliteOrganizacionRepository';
+import { SqliteSyncRepository } from '@/features/sync/infrastructure/SqliteSyncRepository';
 
 import { ListarUsuariosEnAlcance } from '../../application/use-cases/ListarUsuariosEnAlcance';
 import { CrearUsuarioLocal } from '../../application/use-cases/CrearUsuarioLocal';
@@ -12,11 +13,17 @@ import { SqliteUsuarioRepository } from '../../infrastructure/repositories/Sqlit
 export function createUsuariosUseCases(db: SQLiteDatabase) {
   const usuarioRepository = new SqliteUsuarioRepository(db);
   const organizacionRepository = new SqliteOrganizacionRepository(db);
+  const syncRepository = new SqliteSyncRepository(db);
 
   return {
     usuarioRepository,
     organizacionRepository,
-    crearUsuarioLocal: new CrearUsuarioLocal(usuarioRepository, organizacionRepository),
+    crearUsuarioLocal: new CrearUsuarioLocal(
+      usuarioRepository,
+      organizacionRepository,
+      db,
+      syncRepository,
+    ),
     obtenerOpcionesRegistroUsuario: new ObtenerOpcionesRegistroUsuario(
       usuarioRepository,
       organizacionRepository,

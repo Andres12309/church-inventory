@@ -11,10 +11,13 @@ import {
   SyncSessionsColumns,
   Tables,
   TiposActividadColumns,
+  UsuariosColumns,
 } from '@/shared/infrastructure/database/schema';
 import { getNextLamportClock } from '@/shared/infrastructure/sync/SyncContext';
 
+import { resolveSyncPlan } from '../application/SyncSegmentResolver';
 import { SYNCABLE_TABLES } from '../domain/constants/SyncConstants';
+import type { SyncDirection, SyncPlan } from '../domain/entities/SyncPlan';
 import type { SyncChange } from '../domain/entities/SyncChange';
 import type { SyncMeta } from '../domain/entities/SyncMeta';
 import type { SyncSession } from '../domain/entities/SyncSession';
@@ -24,9 +27,11 @@ import { deserializePayloadFromTransfer } from './PayloadSerializer';
 import { SyncChangeApplier } from './SyncChangeApplier';
 import {
   isChangeInOrgScope,
+  isChangeInResolvedPlan,
   mapChangeRow,
   type SyncChangeRow,
 } from './SyncChangeMapper';
+import { buildSnapshotChanges, dedupeChangesByRecord } from './SyncSnapshotBuilder';
 import { shouldApplyRemote, type LwwComparable } from './SyncMergeRules';
 
 type ChecksumRow = {
@@ -102,6 +107,36 @@ export class SqliteSyncRepository implements ISyncRepository {
     return rows
       .map(mapChangeRow)
       .filter((change) => isChangeInOrgScope(change.tabla, change.payload, scopeSet));
+  }
+
+  async listarCambiosParaEnviar(
+    lamportExclusive: number,
+    orgScope: string[],
+    localDeviceId: string,
+    plan?: SyncPlan,
+    direction?: SyncDirection,
+  ): Promise<SyncChange[]> {
+    const resolved = await resolveSyncPlan(this.db, plan ?? { mode: 'all' }, orgScope);
+    const selective = plan?.mode === 'segments' || direction === 'push';
+
+    if (selective) {
+      return dedupeChangesByRecord(
+        await buildSnapshotChanges(this.db, resolved, localDeviceId),
+      );
+    }
+
+    const deltas = await this.listarDeltasDesde(lamportExclusive, orgScope);
+    const filtered = deltas.filter((change) =>
+      isChangeInResolvedPlan(change, change.payload, resolved),
+    );
+
+    if (resolved.tables.has(Tables.USUARIOS)) {
+      const usuarioSnapshot = await buildSnapshotChanges(this.db, resolved, localDeviceId);
+      const usuarioOnly = usuarioSnapshot.filter((c) => c.tabla === Tables.USUARIOS);
+      return dedupeChangesByRecord([...filtered, ...usuarioOnly]);
+    }
+
+    return filtered;
   }
 
   async calcularChecksums(orgIds: string[]): Promise<OrgChecksumEntry[]> {
@@ -228,8 +263,10 @@ export class SqliteSyncRepository implements ISyncRepository {
     changes: SyncChange[],
     orgScope: string[],
     localDeviceId: string,
+    plan?: SyncPlan,
   ): Promise<MergeResult> {
-    const scopeSet = new Set(orgScope);
+    const resolved = await resolveSyncPlan(this.db, plan ?? { mode: 'all' }, orgScope);
+    const scopeSet = new Set(resolved.dataOrgScope.length > 0 ? resolved.dataOrgScope : orgScope);
     let applied = 0;
     let conflicts = 0;
     let rejected = 0;
@@ -242,7 +279,17 @@ export class SqliteSyncRepository implements ISyncRepository {
         }
 
         const payload = deserializePayloadFromTransfer(change.payload);
-        if (!isChangeInOrgScope(change.tabla, payload, scopeSet)) {
+        if (!isChangeInResolvedPlan(change, payload, resolved)) {
+          rejected += 1;
+          continue;
+        }
+
+        if (
+          change.tabla !== Tables.TIPOS_ACTIVIDAD &&
+          change.tabla !== Tables.USUARIOS &&
+          change.tabla !== Tables.ORGANIZACIONES &&
+          !isChangeInOrgScope(change.tabla, payload, scopeSet)
+        ) {
           rejected += 1;
           continue;
         }
@@ -294,6 +341,7 @@ export class SqliteSyncRepository implements ISyncRepository {
       [Tables.OFRENDAS]: Tables.OFRENDAS,
       [Tables.ORGANIZACIONES]: Tables.ORGANIZACIONES,
       [Tables.TIPOS_ACTIVIDAD]: Tables.TIPOS_ACTIVIDAD,
+      [Tables.USUARIOS]: Tables.USUARIOS,
     };
 
     const table = tableMap[tabla];
@@ -309,6 +357,23 @@ export class SqliteSyncRepository implements ISyncRepository {
           : tabla === Tables.TIPOS_ACTIVIDAD
             ? TiposActividadColumns
             : OrganizacionesColumns;
+
+    if (tabla === Tables.USUARIOS) {
+      const row = await this.db.getFirstAsync<{ updated_at: string }>(
+        `SELECT ${UsuariosColumns.UPDATED_AT} AS updated_at
+         FROM ${Tables.USUARIOS} WHERE ${UsuariosColumns.ID} = ?`,
+        [registroId],
+      );
+      if (!row) {
+        return null;
+      }
+      return {
+        lamportClock: 0,
+        updatedAt: row.updated_at,
+        deviceId: '',
+        deletedAt: null,
+      };
+    }
 
     const row =
       tabla === Tables.TIPOS_ACTIVIDAD
@@ -409,6 +474,13 @@ export async function fetchRowPayload(
   if (tabla === Tables.TIPOS_ACTIVIDAD) {
     return db.getFirstAsync<Record<string, unknown>>(
       `SELECT * FROM ${Tables.TIPOS_ACTIVIDAD} WHERE ${TiposActividadColumns.ID} = ?`,
+      [registroId],
+    );
+  }
+
+  if (tabla === Tables.USUARIOS) {
+    return db.getFirstAsync<Record<string, unknown>>(
+      `SELECT * FROM ${Tables.USUARIOS} WHERE ${UsuariosColumns.ID} = ?`,
       [registroId],
     );
   }

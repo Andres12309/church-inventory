@@ -1,10 +1,14 @@
+import type { SQLiteDatabase } from 'expo-sqlite';
+
 import type { PermissionService } from '@/features/auth/application/services/PermissionService';
 import type { Rol } from '@/features/auth/domain/entities/Rol';
 import type { Usuario } from '@/features/auth/domain/entities/Usuario';
 import { OrganizacionNotFoundError } from '@/features/organizaciones/domain/errors/OrganizacionNotFoundError';
 import type { IOrganizacionRepository } from '@/features/organizaciones/domain/repositories/IOrganizacionRepository';
+import { SqliteSyncRepository } from '@/features/sync/infrastructure/SqliteSyncRepository';
 import { etiquetaJerarquiaRol } from '@/shared/config/hierarchyAccess';
-import { UserRoleCodigo } from '@/shared/infrastructure/database/schema';
+import { SyncOperacion, UserRoleCodigo } from '@/shared/infrastructure/database/schema';
+import { registrarUsuarioSync } from '@/shared/infrastructure/sync/SyncChangeRecorder';
 
 import type { CrearUsuarioLocalInput } from '../dto/CrearUsuarioLocalInput';
 import {
@@ -23,6 +27,8 @@ export class CrearUsuarioLocal {
   constructor(
     private readonly usuarioRepository: IUsuarioLocalRepository,
     private readonly organizacionRepository: IOrganizacionRepository,
+    private readonly db: SQLiteDatabase,
+    private readonly syncRepository: SqliteSyncRepository,
   ) {}
 
   async execute(
@@ -101,6 +107,9 @@ export class CrearUsuarioLocal {
       roleId: rolNuevo.id,
       organizacionId: organizacion.id,
       pin: input.pin,
+    }).then(async (usuario) => {
+      await registrarUsuarioSync(this.db, this.syncRepository, usuario.id, SyncOperacion.INSERT);
+      return usuario;
     });
   }
 }

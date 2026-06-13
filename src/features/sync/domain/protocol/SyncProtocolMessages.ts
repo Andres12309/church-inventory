@@ -1,4 +1,5 @@
 import type { SyncChange } from '../entities/SyncChange';
+import type { SyncDirection, SyncPlanWire } from '../entities/SyncPlan';
 
 export type SyncMessageType =
   | 'HANDSHAKE'
@@ -18,6 +19,9 @@ export type SyncHandshakePayload = {
   orgScope: string[];
   lastLamport: number;
   sessionPin?: string;
+  bootstrap?: boolean;
+  syncPlan?: SyncPlanWire;
+  direction?: SyncDirection;
 };
 
 export type SyncHandshakeAckPayload = {
@@ -29,6 +33,9 @@ export type SyncHandshakeAckPayload = {
   schemaVersion: number;
   orgScope: string[];
   lastLamport: number;
+  bootstrap?: boolean;
+  syncPlan?: SyncPlanWire;
+  direction?: SyncDirection;
 };
 
 export type OrgChecksumEntry = {

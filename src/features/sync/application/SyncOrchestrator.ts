@@ -4,6 +4,8 @@ import type { IConsolidationService } from '@/features/configuracion/domain/serv
 import { SyncSessionStatus } from '@/shared/infrastructure/database/schema';
 
 import { SYNC_SCHEMA_VERSION, SYNC_TCP_PORT } from '../domain/constants/SyncConstants';
+import type { SyncDirection, SyncPlan } from '../domain/entities/SyncPlan';
+import { defaultSyncPlan } from '../domain/entities/SyncPlan';
 import type { DiscoveredPeer } from '../domain/entities/DiscoveredPeer';
 import { SyncError } from '../domain/errors/SyncError';
 import type { OrgChecksumEntry } from '../domain/protocol/SyncProtocolMessages';
@@ -35,10 +37,9 @@ export type SyncLocalContext = {
   deviceName: string;
   orgScope: string[];
   sessionPin?: string;
-};
-
-export type SyncOrchestratorOptions = {
-  onProgress?: (update: SyncProgressUpdate) => void;
+  bootstrap?: boolean;
+  syncPlan?: SyncPlan;
+  direction?: SyncDirection;
 };
 
 type ResolvedPeer = {
@@ -46,6 +47,13 @@ type ResolvedPeer = {
   deviceName: string;
   lastLamport: number;
   orgScope: string[];
+  syncPlan: SyncPlan;
+  direction: SyncDirection;
+  bootstrap: boolean;
+};
+
+export type SyncOrchestratorOptions = {
+  onProgress?: (update: SyncProgressUpdate) => void;
 };
 
 type SessionStats = {
@@ -253,6 +261,15 @@ export class SyncOrchestrator {
 
     options?.onProgress?.({ phase: 'checksums', message: 'Comparando estado local...' });
 
+    const forceTransfer =
+      context.bootstrap === true ||
+      context.direction === 'push' ||
+      context.direction === 'receive' ||
+      peer.direction === 'push' ||
+      peer.bootstrap === true ||
+      (context.syncPlan?.mode === 'segments') ||
+      peer.syncPlan.mode === 'segments';
+
     const { localChecksums, remoteChecksums } = await this.intercambiarChecksums(
       connection,
       sharedScope,
@@ -265,7 +282,7 @@ export class SyncOrchestrator {
       conflictsResolved: 0,
     };
 
-    if (checksumsDiffer(localChecksums, remoteChecksums)) {
+    if (forceTransfer || checksumsDiffer(localChecksums, remoteChecksums)) {
       stats = await this.intercambiarDeltas(
         connection,
         context,
@@ -292,6 +309,8 @@ export class SyncOrchestrator {
     expectedPeerId: string | undefined,
   ): Promise<{ peer: ResolvedPeer; sharedScope: string[] }> {
     const isInitiator = expectedPeerId != null;
+    const localPlan = context.syncPlan ?? defaultSyncPlan();
+    const localDirection = context.direction ?? 'bidirectional';
 
     if (isInitiator) {
       await connection.send({
@@ -302,6 +321,9 @@ export class SyncOrchestrator {
         orgScope: context.orgScope,
         lastLamport: localLamport,
         sessionPin: context.sessionPin,
+        bootstrap: context.bootstrap,
+        syncPlan: localPlan,
+        direction: localDirection,
       });
 
       const ack = await connection.receive();
@@ -318,10 +340,16 @@ export class SyncOrchestrator {
         throw new SyncError('Versión de esquema incompatible');
       }
 
-      const sharedScope = intersectScopes(context.orgScope, ack.orgScope);
-      if (sharedScope.length === 0) {
+      const peerBootstrap = ack.bootstrap === true;
+      const sharedScope = peerBootstrap
+        ? context.orgScope
+        : intersectScopes(context.orgScope, ack.orgScope);
+
+      if (sharedScope.length === 0 && !peerBootstrap) {
         throw new SyncError('No hay organizaciones compartidas entre dispositivos');
       }
+
+      const peerPlan = ack.syncPlan ?? defaultSyncPlan();
 
       return {
         peer: {
@@ -329,8 +357,11 @@ export class SyncOrchestrator {
           deviceName: ack.deviceName,
           lastLamport: ack.lastLamport,
           orgScope: ack.orgScope,
+          syncPlan: peerPlan,
+          direction: ack.direction ?? 'bidirectional',
+          bootstrap: peerBootstrap,
         },
-        sharedScope,
+        sharedScope: sharedScope.length > 0 ? sharedScope : context.orgScope,
       };
     }
 
@@ -349,6 +380,9 @@ export class SyncOrchestrator {
         schemaVersion: SYNC_SCHEMA_VERSION,
         orgScope: context.orgScope,
         lastLamport: localLamport,
+        bootstrap: context.bootstrap,
+        syncPlan: localPlan,
+        direction: localDirection,
       });
       throw new SyncError('Versión de esquema incompatible');
     }
@@ -363,12 +397,19 @@ export class SyncOrchestrator {
         schemaVersion: SYNC_SCHEMA_VERSION,
         orgScope: context.orgScope,
         lastLamport: localLamport,
+        bootstrap: context.bootstrap,
+        syncPlan: localPlan,
+        direction: localDirection,
       });
       throw new SyncError('PIN de sesión inválido');
     }
 
-    const sharedScope = intersectScopes(context.orgScope, handshake.orgScope);
-    if (sharedScope.length === 0) {
+    const isBootstrapReceiver = context.bootstrap === true;
+    const sharedScope = isBootstrapReceiver
+      ? handshake.orgScope
+      : intersectScopes(context.orgScope, handshake.orgScope);
+
+    if (sharedScope.length === 0 && !isBootstrapReceiver) {
       await connection.send({
         type: 'HANDSHAKE_ACK',
         accepted: false,
@@ -378,9 +419,14 @@ export class SyncOrchestrator {
         schemaVersion: SYNC_SCHEMA_VERSION,
         orgScope: context.orgScope,
         lastLamport: localLamport,
+        bootstrap: context.bootstrap,
+        syncPlan: localPlan,
+        direction: localDirection,
       });
       throw new SyncError('No hay organizaciones compartidas entre dispositivos');
     }
+
+    const peerPlan = handshake.syncPlan ?? defaultSyncPlan();
 
     await connection.send({
       type: 'HANDSHAKE_ACK',
@@ -390,6 +436,9 @@ export class SyncOrchestrator {
       schemaVersion: SYNC_SCHEMA_VERSION,
       orgScope: context.orgScope,
       lastLamport: localLamport,
+      bootstrap: context.bootstrap,
+      syncPlan: localPlan,
+      direction: localDirection,
     });
 
     return {
@@ -398,8 +447,11 @@ export class SyncOrchestrator {
         deviceName: handshake.deviceName,
         lastLamport: handshake.lastLamport,
         orgScope: handshake.orgScope,
+        syncPlan: peerPlan,
+        direction: handshake.direction ?? 'bidirectional',
+        bootstrap: handshake.bootstrap === true,
       },
-      sharedScope,
+      sharedScope: sharedScope.length > 0 ? sharedScope : handshake.orgScope,
     };
   }
 
@@ -448,6 +500,11 @@ export class SyncOrchestrator {
     let conflictsResolved = 0;
     let rejected = 0;
 
+    const localDirection = context.direction ?? 'bidirectional';
+    const localPlan = context.syncPlan ?? defaultSyncPlan();
+    const pushOnly = localDirection === 'push' || peer.bootstrap;
+    const responderReceiveOnly = context.bootstrap === true || localDirection === 'receive';
+
     if (isInitiator) {
       await connection.send({ type: 'DELTA_REQUEST', sinceLamport: peer.lastLamport });
 
@@ -456,18 +513,27 @@ export class SyncOrchestrator {
         throw new SyncError('Se esperaba DELTA del peer');
       }
 
-      options?.onProgress?.({ phase: 'merging', message: 'Aplicando cambios remotos...' });
-      const mergeIn = await this.syncRepository.aplicarCambiosRemotos(
-        inbound.changes.map(fromWireChange),
-        sharedScope,
-        context.deviceId,
-      );
-      recordsReceived = inbound.changes.length;
-      conflictsResolved += mergeIn.conflicts;
-      rejected += mergeIn.rejected;
+      if (!pushOnly && inbound.changes.length > 0) {
+        options?.onProgress?.({ phase: 'merging', message: 'Aplicando cambios remotos...' });
+        const mergeIn = await this.syncRepository.aplicarCambiosRemotos(
+          inbound.changes.map(fromWireChange),
+          sharedScope,
+          context.deviceId,
+          peer.syncPlan,
+        );
+        recordsReceived = inbound.changes.length;
+        conflictsResolved += mergeIn.conflicts;
+        rejected += mergeIn.rejected;
+      }
 
       const outbound = prepareChangesForWire(
-        await this.syncRepository.listarDeltasDesde(peer.lastLamport, sharedScope),
+        await this.syncRepository.listarCambiosParaEnviar(
+          peer.lastLamport,
+          sharedScope,
+          context.deviceId,
+          localPlan,
+          pushOnly ? 'push' : localDirection,
+        ),
       );
       await connection.send({ type: 'DELTA', changes: outbound.map(toWireChange) });
       recordsSent = outbound.length;
@@ -477,9 +543,18 @@ export class SyncOrchestrator {
         throw new SyncError('Se esperaba DELTA_REQUEST');
       }
 
-      const outbound = prepareChangesForWire(
-        await this.syncRepository.listarDeltasDesde(request.sinceLamport, sharedScope),
-      );
+      const shouldSendOutbound = !responderReceiveOnly && peer.direction !== 'push';
+      const outbound = shouldSendOutbound
+        ? prepareChangesForWire(
+            await this.syncRepository.listarCambiosParaEnviar(
+              request.sinceLamport,
+              sharedScope,
+              context.deviceId,
+              localPlan,
+              context.direction,
+            ),
+          )
+        : [];
       await connection.send({ type: 'DELTA', changes: outbound.map(toWireChange) });
       recordsSent = outbound.length;
 
@@ -488,15 +563,18 @@ export class SyncOrchestrator {
         throw new SyncError('Se esperaba DELTA del iniciador');
       }
 
-      options?.onProgress?.({ phase: 'merging', message: 'Aplicando cambios remotos...' });
-      const mergeIn = await this.syncRepository.aplicarCambiosRemotos(
-        inbound.changes.map(fromWireChange),
-        sharedScope,
-        context.deviceId,
-      );
-      recordsReceived = inbound.changes.length;
-      conflictsResolved += mergeIn.conflicts;
-      rejected += mergeIn.rejected;
+      if (inbound.changes.length > 0) {
+        options?.onProgress?.({ phase: 'merging', message: 'Aplicando cambios remotos...' });
+        const mergeIn = await this.syncRepository.aplicarCambiosRemotos(
+          inbound.changes.map(fromWireChange),
+          sharedScope,
+          context.deviceId,
+          peer.syncPlan,
+        );
+        recordsReceived = inbound.changes.length;
+        conflictsResolved += mergeIn.conflicts;
+        rejected += mergeIn.rejected;
+      }
     }
 
     return {

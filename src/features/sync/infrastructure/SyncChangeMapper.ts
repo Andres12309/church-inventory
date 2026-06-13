@@ -1,5 +1,7 @@
 import { Tables } from '@/shared/infrastructure/database/schema';
 
+import type { ResolvedSyncPlan } from '../application/SyncSegmentResolver';
+import { isTableInResolvedPlan } from '../application/SyncSegmentResolver';
 import type { SyncChange } from '../domain/entities/SyncChange';
 
 export type SyncChangeRow = {
@@ -64,6 +66,11 @@ export function isChangeInOrgScope(
     return true;
   }
 
+  if (tabla === Tables.USUARIOS) {
+    const orgId = payload.organizacion_id ?? payload.organizacionId;
+    return typeof orgId === 'string' && scopeSet.has(orgId);
+  }
+
   const orgId = extractOrganizacionId(tabla, payload);
   if (!orgId) {
     return false;
@@ -79,4 +86,33 @@ export function isChangeInOrgScope(
   }
 
   return false;
+}
+
+export function isChangeInResolvedPlan(
+  change: SyncChange,
+  payload: Record<string, unknown>,
+  resolved: ResolvedSyncPlan,
+): boolean {
+  if (!isTableInResolvedPlan(change.tabla, resolved)) {
+    return false;
+  }
+
+  if (change.tabla === Tables.USUARIOS) {
+    if (resolved.userIds && !resolved.userIds.includes(change.registroId)) {
+      return false;
+    }
+    const orgId = payload.organizacion_id ?? payload.organizacionId;
+    return typeof orgId === 'string' && resolved.dataOrgScope.includes(orgId);
+  }
+
+  if (change.tabla === Tables.TIPOS_ACTIVIDAD) {
+    return true;
+  }
+
+  if (change.tabla === Tables.ORGANIZACIONES) {
+    return resolved.orgScope.includes(change.registroId);
+  }
+
+  const orgId = extractOrganizacionId(change.tabla, payload);
+  return orgId != null && resolved.dataOrgScope.includes(orgId);
 }

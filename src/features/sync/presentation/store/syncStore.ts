@@ -1,6 +1,8 @@
 import { create } from 'zustand';
 
 import type { DiscoveredPeer } from '../../domain/entities/DiscoveredPeer';
+import type { SyncPlan } from '../../domain/entities/SyncPlan';
+import { defaultSyncPlan } from '../../domain/entities/SyncPlan';
 import type { SyncPhase } from '../../application/SyncOrchestrator';
 
 type SyncState = {
@@ -13,6 +15,8 @@ type SyncState = {
   recordsProcessed: number;
   recordsTotal: number;
   sessionPin: string;
+  syncPlan: SyncPlan;
+  pushOnly: boolean;
   errorMessage: string | null;
   wifiConnected: boolean;
 };
@@ -25,6 +29,8 @@ type SyncActions = {
   setSyncing: (syncing: boolean) => void;
   setProgress: (phase: SyncPhase, message: string, processed?: number, total?: number) => void;
   setSessionPin: (pin: string) => void;
+  setSyncPlan: (plan: SyncPlan) => void;
+  setPushOnly: (pushOnly: boolean) => void;
   setWifiConnected: (connected: boolean) => void;
   setError: (message: string | null) => void;
   resetRuntime: () => void;
@@ -45,6 +51,8 @@ const initialRuntime = {
 export const useSyncStore = create<SyncState & SyncActions>((set, get) => ({
   ...initialRuntime,
   sessionPin: '',
+  syncPlan: defaultSyncPlan(),
+  pushOnly: false,
   wifiConnected: false,
 
   setPeers: (peers) => set({ peers }),
@@ -67,6 +75,10 @@ export const useSyncStore = create<SyncState & SyncActions>((set, get) => ({
     set({ phase, statusMessage: message, recordsProcessed: processed, recordsTotal: total }),
 
   setSessionPin: (pin) => set({ sessionPin: pin.replace(/\D/g, '').slice(0, 4) }),
+
+  setSyncPlan: (plan) => set({ syncPlan: plan }),
+
+  setPushOnly: (pushOnly) => set({ pushOnly }),
 
   setWifiConnected: (connected) => set({ wifiConnected: connected }),
 

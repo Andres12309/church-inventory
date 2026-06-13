@@ -12,5 +12,6 @@ export const SYNCABLE_TABLES = [
   "ofrendas",
   "organizaciones",
   "tipos_actividad",
+  "usuarios",
 ] as const;
 export type SyncableTable = (typeof SYNCABLE_TABLES)[number];
